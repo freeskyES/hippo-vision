@@ -86,7 +86,7 @@ public final class AppModule: ObservableObject {
         // 2. Initialize components
         frameSync = FrameSync()
         composer = CI_SBSComposer()
-        transport = WebRTCManager(config: .standard)
+        transport = WebRTCManager(config: .wifiHotspot)
 
         leftCapture = LeftCaptureSession()
         rightCapture = RightCaptureSession()

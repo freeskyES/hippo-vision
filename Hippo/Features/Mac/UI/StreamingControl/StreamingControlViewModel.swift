@@ -421,7 +421,7 @@ public final class StreamingControlViewModel {
         // Initialize components
         let sync = FrameSync()
         let comp = CI_SBSComposer()
-        let webrtc = WebRTCManager(config: isHalfBitrateEnabled ? .lowBandwidth : .standard)
+        let webrtc = WebRTCManager(config: .wifiHotspot)
 
         self.frameSync = sync
         self.composer = comp
@@ -477,7 +477,7 @@ public final class StreamingControlViewModel {
         logger.info("Starting mono capture...")
 
         // Initialize WebRTC transport
-        let webrtc = WebRTCManager(config: isHalfBitrateEnabled ? .lowBandwidth : .standard)
+        let webrtc = WebRTCManager(config: .wifiHotspot)
         self.transport = webrtc
 
         // Mono video 시작 - settings를 전달하지 않아 카메라의 네이티브 해상도 사용

@@ -181,6 +181,20 @@ public struct TransportConfig {
         resolutionDownsampleFactor: 2       // P0.1: 2x downsampling for bandwidth saving
     )
 
+    /// WiFi hotspot configuration — conservative bitrate for Mac hotspot → Galaxy XR
+    /// Measured: ~1-2 Mbps actual throughput on 2.4GHz WiFi hotspot
+    public static let wifiHotspot = TransportConfig(
+        stunServers: ["stun:stun.l.google.com:19302"],
+        turnServers: [],
+        codec: .h264(.baseline),
+        targetBitrate: 4_000_000,           // 4 Mbps target
+        maxBitrate: 8_000_000,              // 8 Mbps max
+        minBitrate: 500_000,                // 500 Kbps min — let GCC adapt freely
+        degradationPreference: .maintainFramerate,  // prioritize smooth playback
+        enableAdaptiveBitrate: true,
+        resolutionDownsampleFactor: 1
+    )
+
     public init(
         stunServers: [String],
         turnServers: [TURNServer],

@@ -125,15 +125,15 @@ public final class WebRTCManager: NSObject, IVideoTransport {
             print("[WebRTCManager] WebRTC already initialized, skipping SSL/tracer setup")
         }
 
-        // Use HEVC encoder factory for better compression
-        let encoderFactory = HEVCVideoEncoderFactory()
+        // Use default H.264 encoder (Galaxy XR requires CABAC — HEVC not supported by browser/receiver)
+        let encoderFactory = LKRTCDefaultVideoEncoderFactory()
         let decoderFactory = LKRTCDefaultVideoDecoderFactory()
 
         peerConnectionFactory = LKRTCPeerConnectionFactory(
             encoderFactory: encoderFactory,
             decoderFactory: decoderFactory
         )
-        print("[WebRTCManager] Peer connection factory created with HEVC support")
+        print("[WebRTCManager] Peer connection factory created with H.264 support")
 
         // 2. Create peer connection
         print("[WebRTCManager] Creating peer connection...")

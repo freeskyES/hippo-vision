@@ -69,7 +69,7 @@ private enum PatientModelContainerKey: DependencyKey {
       let modelConfiguration = ModelConfiguration(
         schema: schema,
         isStoredInMemoryOnly: false,
-        cloudKitDatabase: .private("iCloud.com.television.hippo.app")
+        cloudKitDatabase: .none
       )
 
       return try ModelContainer(
@@ -116,7 +116,7 @@ private enum PatientModelContainerKey: DependencyKey {
         let modelConfiguration = ModelConfiguration(
           schema: schema,
           isStoredInMemoryOnly: false,
-          cloudKitDatabase: .private("iCloud.com.television.hippo.app")
+          cloudKitDatabase: .none
         )
 
         return try ModelContainer(
