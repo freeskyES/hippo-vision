@@ -153,7 +153,7 @@ public struct TransportConfig {
     /// Resolution downsample factor (1 = no downsampling, 2 = half, 3 = third)
     /// Default: 1 (no downsampling for maximum quality)
     /// Use 2 or 3 for bandwidth-constrained scenarios
-    public let resolutionDownsampleFactor: Int
+    public let resolutionDownsampleFactor: Double
 
     /// Standard configuration (no downsampling, 30 Mbps for full quality)
     public static let standard = TransportConfig(
@@ -165,7 +165,7 @@ public struct TransportConfig {
         minBitrate: 10_000_000,             // 10 Mbps
         degradationPreference: .maintainResolution,
         enableAdaptiveBitrate: true,
-        resolutionDownsampleFactor: 1       // P0.1: No downsampling by default
+        resolutionDownsampleFactor: 1.0     // P0.1: No downsampling by default
     )
 
     /// Low bandwidth configuration (2x downsampling, 15 Mbps)
@@ -178,7 +178,7 @@ public struct TransportConfig {
         minBitrate: 5_000_000,              // 5 Mbps
         degradationPreference: .maintainResolution,
         enableAdaptiveBitrate: true,
-        resolutionDownsampleFactor: 2       // P0.1: 2x downsampling for bandwidth saving
+        resolutionDownsampleFactor: 2.0     // P0.1: 2x downsampling for bandwidth saving
     )
 
     /// WiFi hotspot configuration — conservative bitrate for Mac hotspot → Galaxy XR
@@ -193,7 +193,7 @@ public struct TransportConfig {
         minBitrate: 100_000,                // 100 Kbps min — let GCC adapt freely
         degradationPreference: .maintainResolution,  // prioritize image quality over fps
         enableAdaptiveBitrate: true,
-        resolutionDownsampleFactor: 1
+        resolutionDownsampleFactor: 1.0
     )
 
     /// Home WiFi / dedicated router configuration (2.4GHz)
@@ -211,23 +211,24 @@ public struct TransportConfig {
         minBitrate: 300_000,                // 300 Kbps min (let GCC adapt freely downward)
         degradationPreference: .maintainResolution,
         enableAdaptiveBitrate: true,
-        resolutionDownsampleFactor: 1
+        resolutionDownsampleFactor: 1.0
     )
 
     /// 5GHz WiFi / dedicated router configuration (ASUS RT-BE58 Go)
-    /// Measured: actual throughput ~3-5Mbps to Galaxy XR over 5GHz WiFi.
-    /// Previous 8Mbps max caused GCC probe→overshoot→6s pause (same pattern as 2.4GHz).
-    /// Fix: target=3Mbps matches observed stable rate + setBweMinBitrateBps override.
+    /// Half SBS composed frame = 1920×540 (960×540 per eye).
+    /// downsample=2 (960×270) stable but low quality.
+    /// downsample=1 (1920×540@8Mbps) = VT-CS -12900 from 0.3s — encoder overloaded.
+    /// Middle ground: downsample=1.5 (1280×360) at proven 5-6Mbps.
     public static let wifi5GHz = TransportConfig(
         stunServers: ["stun:stun.l.google.com:19302"],
         turnServers: [],
         codec: .h264(.baseline),
-        targetBitrate: 5_000_000,           // 5 Mbps target (more bits/pixel for 960×540)
+        targetBitrate: 5_000_000,           // 5 Mbps target (proven stable on 5GHz WiFi)
         maxBitrate: 6_000_000,              // 6 Mbps max
         minBitrate: 2_000_000,              // 2 Mbps min
         degradationPreference: .maintainResolution,
         enableAdaptiveBitrate: true,
-        resolutionDownsampleFactor: 2       // Half SBS 1920×1080 → 960×540 encoding
+        resolutionDownsampleFactor: 1.5     // 1920×540 → 1280×360 encoding (640×360/eye)
     )
 
     public init(
@@ -239,7 +240,7 @@ public struct TransportConfig {
         minBitrate: Int,
         degradationPreference: DegradationPreference,
         enableAdaptiveBitrate: Bool,
-        resolutionDownsampleFactor: Int = 1  // P0.1: Default to no downsampling
+        resolutionDownsampleFactor: Double = 1.0  // P0.1: Default to no downsampling
     ) {
         self.stunServers = stunServers
         self.turnServers = turnServers
@@ -249,7 +250,7 @@ public struct TransportConfig {
         self.minBitrate = minBitrate
         self.degradationPreference = degradationPreference
         self.enableAdaptiveBitrate = enableAdaptiveBitrate
-        self.resolutionDownsampleFactor = max(1, resolutionDownsampleFactor)  // Minimum 1
+        self.resolutionDownsampleFactor = max(1.0, resolutionDownsampleFactor)  // Minimum 1.0
     }
 }
 

@@ -356,7 +356,7 @@ public final class WebRTCManager: NSObject, IVideoTransport {
         encoding.networkPriority = .high
 
         // P0.1: Use configurable downsample factor
-        let factor = Double(config.resolutionDownsampleFactor)
+        let factor = config.resolutionDownsampleFactor
         encoding.scaleResolutionDownBy = NSNumber(value: factor)
 
         encoding.isActive = true
