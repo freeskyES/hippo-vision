@@ -86,7 +86,7 @@ public final class StreamingControlViewModel {
         }
     }
 
-    var scalingMode: ScalingMode = .quarter {
+    var scalingMode: ScalingMode = .none {
         didSet {
             logger.info("Scaling mode changed: \(oldValue.rawValue) → \(self.scalingMode.rawValue)")
 
@@ -102,7 +102,7 @@ public final class StreamingControlViewModel {
         }
     }
 
-    var isHalfBitrateEnabled: Bool = true {
+    var isHalfBitrateEnabled: Bool = false {
         didSet {
             logger.info("Bitrate mode changed: \(oldValue ? "15 Mbps" : "30 Mbps") → \(self.isHalfBitrateEnabled ? "15 Mbps" : "30 Mbps")")
 
@@ -421,7 +421,7 @@ public final class StreamingControlViewModel {
         // Initialize components
         let sync = FrameSync()
         let comp = CI_SBSComposer()
-        let webrtc = WebRTCManager(config: .wifiHotspot)
+        let webrtc = WebRTCManager(config: .wifi5GHz)
 
         self.frameSync = sync
         self.composer = comp
@@ -477,7 +477,7 @@ public final class StreamingControlViewModel {
         logger.info("Starting mono capture...")
 
         // Initialize WebRTC transport
-        let webrtc = WebRTCManager(config: .wifiHotspot)
+        let webrtc = WebRTCManager(config: .wifi5GHz)
         self.transport = webrtc
 
         // Mono video 시작 - settings를 전달하지 않아 카메라의 네이티브 해상도 사용
@@ -637,6 +637,20 @@ public final class StreamingControlViewModel {
         composeLatency = 0.0
         encodeLatency = 0.0
         e2eLatency = 0.0
+    }
+
+    // MARK: - Public Methods: Tab Visibility
+
+    /// Called when StreamingControl tab becomes visible.
+    /// Flushes stale preview state so the next frame renders correctly.
+    func refreshPreview() {
+        guard isStreaming else { return }
+        if #available(macOS 15.0, *) {
+            previewLayer.sampleBufferRenderer.flush()
+        } else {
+            previewLayer.flush()
+        }
+        logger.info("Preview refreshed on tab switch")
     }
 
     // MARK: - Public Methods: Inspector

@@ -20,8 +20,8 @@ public final class WebRTCManager: NSObject, IVideoTransport {
 
     private enum ConnectionConstants {
         static let disconnectionGracePeriod: TimeInterval = 10.0
-        // OPTIMIZED: Reduced stats polling frequency to minimize overhead
-        static let statsInterval: TimeInterval = 5.0  // Was 1.0s, now 5.0s
+        // GCC debug: 2s interval for fine-grained congestion monitoring
+        static let statsInterval: TimeInterval = 2.0
         static let statsLogDelay: TimeInterval = 2.0
     }
 
@@ -77,6 +77,9 @@ public final class WebRTCManager: NSObject, IVideoTransport {
     // MARK: Stats tracking
 
     private var statsTimer: Timer?
+    private var prevBytesSent: Int64 = 0
+    private var prevPacketsSent: Int64 = 0
+    private var prevFramesEncoded: Int64 = 0
 
     // P0.3: Disconnection timer for ICE restart
     private var disconnectionTimer: Timer?
@@ -156,8 +159,7 @@ public final class WebRTCManager: NSObject, IVideoTransport {
         logger.info("WebRTC stopping...")
 
         // 1. Stop timers immediately
-        statsTimer?.invalidate()
-        statsTimer = nil
+        stopPeriodicStats()
 
         disconnectionTimer?.invalidate()
         disconnectionTimer = nil
@@ -262,6 +264,9 @@ public final class WebRTCManager: NSObject, IVideoTransport {
         }
 
         rtcConfig.sdpSemantics = .unifiedPlan
+        rtcConfig.continualGatheringPolicy = .gatherContinually
+        // NOTE: bundlePolicy/rtcpMuxPolicy intentionally left at defaults
+        // maxBundle + require caused ICE instability → repeated DISCONNECTED/FAILED cycles
 
         let constraints = LKRTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
         guard let pc = peerConnectionFactory.peerConnection(with: rtcConfig, constraints: constraints, delegate: self) else {
@@ -341,7 +346,8 @@ public final class WebRTCManager: NSObject, IVideoTransport {
 
         // OPTIMIZED: Bitrate configuration for medical streaming
         encoding.maxBitrateBps = NSNumber(value: config.maxBitrate)
-        encoding.minBitrateBps = NSNumber(value: config.minBitrate)
+        // NOTE: minBitrateBps intentionally NOT set — can cause VT-CS kVTParameterErr (-12902)
+        // when GCC adjusts bitrate at runtime. Let GCC handle its own minimum.
 
         // OPTIMIZED: Cap at 30fps for Half SBS 1/4 mode (balance quality vs bandwidth)
         encoding.maxFramerate = NSNumber(value: 30)  // Was 60, now 30 for optimization
@@ -356,6 +362,9 @@ public final class WebRTCManager: NSObject, IVideoTransport {
         encoding.isActive = true
 
         parameters.encodings[0] = encoding
+        // NOTE: degradationPreference intentionally NOT set — causes VT-CS kVTParameterErr (-12902)
+        // WebRTC's default (balanced) works fine for our use case
+
         sender.parameters = parameters
 
         logger.info("""
@@ -404,6 +413,87 @@ public final class WebRTCManager: NSObject, IVideoTransport {
     private func cancelDisconnectionTimer() {
         disconnectionTimer?.invalidate()
         disconnectionTimer = nil
+    }
+
+    // MARK: - Periodic Outbound Stats (diagnose GCC freeze)
+
+    private func startPeriodicStats() {
+        statsTimer?.invalidate()
+        prevBytesSent = 0; prevPacketsSent = 0; prevFramesEncoded = 0
+
+        statsTimer = Timer.scheduledTimer(withTimeInterval: ConnectionConstants.statsInterval, repeats: true) { [weak self] _ in
+            self?.collectOutboundStats()
+        }
+        logger.info("Outbound stats started (\(ConnectionConstants.statsInterval)s interval)")
+    }
+
+    private func stopPeriodicStats() {
+        statsTimer?.invalidate()
+        statsTimer = nil
+    }
+
+    private func collectOutboundStats() {
+        peerConnection?.statistics { [weak self] report in
+            guard let self = self else { return }
+            for (_, value) in report.statistics {
+                let desc = String(describing: value)
+                guard desc.contains("outbound-rtp") && desc.contains("kind=video") else { continue }
+
+                // Extract key metrics from RTCStats description
+                let bytesSent = self.extractInt64(from: desc, key: "bytesSent") ?? 0
+                let packetsSent = self.extractInt64(from: desc, key: "packetsSent") ?? 0
+                let framesEncoded = self.extractInt64(from: desc, key: "framesEncoded") ?? 0
+                let framesSent = self.extractInt64(from: desc, key: "framesSent") ?? 0
+                let qualityLimit = self.extractString(from: desc, key: "qualityLimitationReason") ?? "none"
+                let nackCount = self.extractInt64(from: desc, key: "nackCount") ?? 0
+                let pliCount = self.extractInt64(from: desc, key: "pliCount") ?? 0
+                let targetBitrate = self.extractDouble(from: desc, key: "targetBitrate") ?? 0
+                let retransmitted = self.extractInt64(from: desc, key: "retransmittedPacketsSent") ?? 0
+                let frameWidth = self.extractInt64(from: desc, key: "frameWidth") ?? 0
+                let frameHeight = self.extractInt64(from: desc, key: "frameHeight") ?? 0
+                let framesPerSecond = self.extractDouble(from: desc, key: "framesPerSecond") ?? 0
+
+                let deltaBytes = bytesSent - self.prevBytesSent
+                let deltaPackets = packetsSent - self.prevPacketsSent
+                let deltaFrames = framesEncoded - self.prevFramesEncoded
+                let bitrateMbps = Double(deltaBytes) * 8.0 / (ConnectionConstants.statsInterval * 1_000_000.0)
+
+                print("[Mac STATS] pkts:+\(deltaPackets) frames:+\(deltaFrames)(enc:\(framesEncoded) sent:\(framesSent)) " +
+                      "bitrate:\(String(format: "%.2f", bitrateMbps))Mbps target:\(String(format: "%.0f", targetBitrate / 1000))kbps " +
+                      "res:\(frameWidth)×\(frameHeight)@\(String(format: "%.0f", framesPerSecond))fps " +
+                      "qualityLimit:\(qualityLimit) nack:\(nackCount) pli:\(pliCount) retx:\(retransmitted)")
+
+                self.prevBytesSent = bytesSent
+                self.prevPacketsSent = packetsSent
+                self.prevFramesEncoded = framesEncoded
+            }
+        }
+    }
+
+    // MARK: - Stats Parsing Helpers
+
+    private func extractInt64(from desc: String, key: String) -> Int64? {
+        guard let range = desc.range(of: "\(key)=") else { return nil }
+        let start = range.upperBound
+        let sub = desc[start...]
+        let end = sub.firstIndex(where: { !$0.isNumber && $0 != "-" }) ?? sub.endIndex
+        return Int64(sub[start..<end])
+    }
+
+    private func extractDouble(from desc: String, key: String) -> Double? {
+        guard let range = desc.range(of: "\(key)=") else { return nil }
+        let start = range.upperBound
+        let sub = desc[start...]
+        let end = sub.firstIndex(where: { !$0.isNumber && $0 != "." && $0 != "-" }) ?? sub.endIndex
+        return Double(sub[start..<end])
+    }
+
+    private func extractString(from desc: String, key: String) -> String? {
+        guard let range = desc.range(of: "\(key)=") else { return nil }
+        let start = range.upperBound
+        let sub = desc[start...]
+        let end = sub.firstIndex(where: { $0 == "," || $0 == " " || $0 == "}" }) ?? sub.endIndex
+        return String(sub[start..<end])
     }
 
     // MARK: - Public: Signaling Message Handlers
@@ -463,18 +553,7 @@ extension WebRTCManager: LKRTCPeerConnectionDelegate {
         case .connected, .completed:
             state = .connected
             cancelDisconnectionTimer()
-
-            // OPTIMIZED: Log stats on background queue after connection
-            statsQueue.asyncAfter(deadline: .now() + ConnectionConstants.statsLogDelay) { [weak self] in
-                self?.peerConnection?.statistics { report in
-                    for (key, value) in report.statistics {
-                        let valueStr = String(describing: value)
-                        if valueStr.contains("outbound-rtp") {
-                            print("Mac Stats: \(key) = \(value)")
-                        }
-                    }
-                }
-            }
+            startPeriodicStats()
 
         case .disconnected:
             logger.warning("ICE_STATE:disconnected, monitoring for recovery...")

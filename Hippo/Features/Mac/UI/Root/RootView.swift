@@ -41,6 +41,11 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(.light)
+        .onChange(of: selectedTab) { _, newTab in
+            if newTab == .StreamingControl {
+                StreamingControlViewModel.shared.refreshPreview()
+            }
+        }
     }
 }
 

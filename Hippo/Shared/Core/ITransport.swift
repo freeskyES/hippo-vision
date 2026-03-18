@@ -196,6 +196,40 @@ public struct TransportConfig {
         resolutionDownsampleFactor: 1
     )
 
+    /// Home WiFi / dedicated router configuration (2.4GHz)
+    /// GCC freeze diagnosis (2026-03-14): GCC probes up → 2.4GHz WiFi jitter → congestion
+    /// detection → 4-6s transmission halt → repeat. Even maxBitrate=4Mbps caused probes
+    /// to overshoot actual WiFi capacity (~1-3Mbps on 2.4GHz).
+    /// Fix (2026-03-14): Tighten to max=2.5Mbps + SDP x-google-max-bitrate munging
+    /// to constrain GCC probe ceiling at codec level. 2.5Mbps sufficient for 1280×360@30fps.
+    public static let wifiHome = TransportConfig(
+        stunServers: ["stun:stun.l.google.com:19302"],
+        turnServers: [],
+        codec: .h264(.baseline),
+        targetBitrate: 2_000_000,           // 2 Mbps target (within 2.4GHz WiFi capacity)
+        maxBitrate: 2_500_000,              // 2.5 Mbps max (tight ceiling prevents GCC overshoot)
+        minBitrate: 300_000,                // 300 Kbps min (let GCC adapt freely downward)
+        degradationPreference: .maintainResolution,
+        enableAdaptiveBitrate: true,
+        resolutionDownsampleFactor: 1
+    )
+
+    /// 5GHz WiFi / dedicated router configuration (ASUS RT-BE58 Go)
+    /// Measured: actual throughput ~3-5Mbps to Galaxy XR over 5GHz WiFi.
+    /// Previous 8Mbps max caused GCC probe→overshoot→6s pause (same pattern as 2.4GHz).
+    /// Fix: target=3Mbps matches observed stable rate + setBweMinBitrateBps override.
+    public static let wifi5GHz = TransportConfig(
+        stunServers: ["stun:stun.l.google.com:19302"],
+        turnServers: [],
+        codec: .h264(.baseline),
+        targetBitrate: 5_000_000,           // 5 Mbps target (more bits/pixel for 960×540)
+        maxBitrate: 6_000_000,              // 6 Mbps max
+        minBitrate: 2_000_000,              // 2 Mbps min
+        degradationPreference: .maintainResolution,
+        enableAdaptiveBitrate: true,
+        resolutionDownsampleFactor: 2       // Half SBS 1920×1080 → 960×540 encoding
+    )
+
     public init(
         stunServers: [String],
         turnServers: [TURNServer],
