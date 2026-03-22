@@ -184,6 +184,7 @@ public final class WebRTCManager: NSObject, IVideoTransport {
         // 5. Reset candidate state
         pendingRemoteCandidates.removeAll()
         remoteDescriptionSet = false
+        bweHintApplied = false
         frameCount = 0
 
         // 6. Don't cleanup WebRTC global state - it's shared and can only be initialized once
@@ -378,6 +379,26 @@ public final class WebRTCManager: NSObject, IVideoTransport {
         """)
     }
 
+    // MARK: - GCC Initial Bitrate Hint
+
+    /// Hint GCC to start at target bitrate instead of default ~300kbps.
+    /// Called ONCE on ICE connected — NOT repeatedly (repeated calls interfere with GCC backoff).
+    /// This eliminates the 6-second low-quality ramp-up period on known networks.
+    private var bweHintApplied = false
+
+    private func hintInitialBitrate() {
+        guard !bweHintApplied else { return }  // One-shot only
+        bweHintApplied = true
+
+        let success = peerConnection?.setBweMinBitrateBps(
+            nil,                                                    // minBitrate: let GCC decide
+            currentBitrateBps: NSNumber(value: config.targetBitrate),  // start at target (e.g. 5Mbps)
+            maxBitrateBps: NSNumber(value: config.maxBitrate)          // ceiling (e.g. 6Mbps)
+        ) ?? false
+
+        logger.info("BWE hint: start=\(self.config.targetBitrate/1_000_000)Mbps max=\(self.config.maxBitrate/1_000_000)Mbps applied=\(success)")
+    }
+
     // MARK: - P0.3: ICE Restart
 
     private func attemptIceRestart() {
@@ -553,6 +574,7 @@ extension WebRTCManager: LKRTCPeerConnectionDelegate {
         case .connected, .completed:
             state = .connected
             cancelDisconnectionTimer()
+            hintInitialBitrate()
             startPeriodicStats()
 
         case .disconnected:
