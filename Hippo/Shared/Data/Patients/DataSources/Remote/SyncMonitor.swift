@@ -29,18 +29,34 @@ public class SyncMonitor {
         guard let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey] as? NSPersistentCloudKitContainer.Event else { return }
 
         Task { @MainActor in
-            let eventType = event.type == .import ? "⬇️ [받기]" : "⬆️ [보내기]"
+            let eventTypeName: String
+            switch event.type {
+            case .import: eventTypeName = "[CK-Import]"
+            case .export: eventTypeName = "[CK-Export]"
+            case .setup:  eventTypeName = "[CK-Setup]"
+            @unknown default: eventTypeName = "[CK-Unknown]"
+            }
 
             if event.endDate == nil {
+                // 시작
+                print("\(eventTypeName) Sync 시작 | store: \(event.storeIdentifier)")
                 self.isSyncing = true
             } else {
                 // 종료
                 if let error = event.error {
-                    print("\(eventType) CloudKit Sync Failed: \(error.localizedDescription)")
+                    let nsError = error as NSError
+                    print("\(eventTypeName) Sync 실패")
+                    print("  error: \(error.localizedDescription)")
+                    print("  domain: \(nsError.domain), code: \(nsError.code)")
+                    if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+                        print("  underlying: \(underlying.domain) / \(underlying.code) / \(underlying.localizedDescription)")
+                    }
+                    if let partialErrors = nsError.userInfo["CKPartialErrors"] as? [AnyHashable: Any] {
+                        print("  partialErrors: \(partialErrors)")
+                    }
                 } else {
-                    print("\(eventType) CloudKit Sync Finished Successfully")
+                    print("\(eventTypeName) Sync 완료 | store: \(event.storeIdentifier)")
 
-                    // Import가 성공적으로 끝났다면 데이터가 변경되었을 가능성이 높으므로 리프레시 트리거
                     if event.type == .import {
                         self.dataDidChange = true
                     }
