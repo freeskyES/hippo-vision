@@ -29,6 +29,8 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Mac에서 실시간 수술 영상을 수신하기 위해 로컬 네트워크 접근이 필요합니다.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_ws._tcp</string>

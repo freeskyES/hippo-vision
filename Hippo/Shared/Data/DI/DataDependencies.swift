@@ -69,13 +69,20 @@ private enum PatientModelContainerKey: DependencyKey {
       let modelConfiguration = ModelConfiguration(
         schema: schema,
         isStoredInMemoryOnly: false,
-        cloudKitDatabase: .private("iCloud.com.television.hippo")
+        cloudKitDatabase: .none // cloudKitDatabase: .private("iCloud.com.television.hippo")
       )
 
-      return try ModelContainer(
+      let container = try ModelContainer(
         for: schema,
         configurations: [modelConfiguration]
       )
+
+      // MARK: - 🧪 Demo Data Seeding (DELETE THIS BLOCK WHEN NO LONGER NEEDED)
+      #if DEBUG
+      seedDemoDataIfEmpty(context: container.mainContext)
+      #endif
+
+      return container
     } catch {
       // If migration fails during development, delete the store and try again
       print("⚠️ ModelContainer creation failed: \(error)")
@@ -116,7 +123,7 @@ private enum PatientModelContainerKey: DependencyKey {
         let modelConfiguration = ModelConfiguration(
           schema: schema,
           isStoredInMemoryOnly: false,
-          cloudKitDatabase: .private("iCloud.com.television.hippo")
+          cloudKitDatabase: .none // cloudKitDatabase: .private("iCloud.com.television.hippo")
         )
 
         return try ModelContainer(
@@ -235,3 +242,166 @@ private final class PatientRemoteDataSourceMock: PatientRemoteDataSource {
     // Mock: do nothing
   }
 }
+
+// MARK: - 🧪 Demo Data Seeding (DELETE THIS ENTIRE SECTION WHEN NO LONGER NEEDED)
+
+#if DEBUG
+@MainActor
+private func seedDemoDataIfEmpty(context: ModelContext) {
+  // 3D 모델이 포함된 데모 데이터가 있는지 확인
+  let assetDescriptor = FetchDescriptor<SDOperationAsset>()
+  let assetCount = (try? context.fetchCount(assetDescriptor)) ?? 0
+
+  if assetCount > 0 {
+    print("🌱 Demo data with 3D models already exists, skipping seed")
+    return
+  }
+
+  // 기존 데이터 삭제 (iCloud에서 3D 모델 없이 내려온 데이터 정리)
+  let patientDescriptor = FetchDescriptor<SDPatient>()
+  if let existingPatients = try? context.fetch(patientDescriptor), !existingPatients.isEmpty {
+    print("🌱 Removing \(existingPatients.count) patients without 3D models...")
+    existingPatients.forEach { context.delete($0) }
+    try? context.save()
+  }
+
+  print("🌱 Seeding demo data...")
+
+  let calendar = Calendar(identifier: .gregorian)
+  let now = Date()
+
+  let sharedDiagnosis = "간세포암(Hepatocellular carcinoma, HCC) — 2.1 cm 종양"
+  let sharedSurgicalSite = "간 S5(5분절), 중앙부"
+  let sharedDetails = "동맥기 조영증강 및 지연기 소실(washout) 소견을 보이는 간 S5 종양으로, 중간간정맥(MHV) 인접하나 혈관 침범은 없음. 약 5 mm 안전거리를 확보한 부분 간절제 예정."
+
+  // 3D 모델 에셋 (KBA_HCC.usdz) 로드
+  let modelData: Data = {
+    guard let url = Bundle.main.url(forResource: "KBA_HCC", withExtension: "usdz"),
+          let data = try? Data(contentsOf: url) else {
+      print("⚠️ KBA_HCC.usdz not found in bundle, skipping 3D model")
+      return Data()
+    }
+    print("🌱 Loaded KBA_HCC.usdz (\(data.count / 1024)KB)")
+    return data
+  }()
+
+  // 환자 1: 김우빈 (38세, 남) — patientNumber: 1666
+  let patient1 = SDPatient(
+    id: UUID().uuidString,
+    patientNumber: "1666",
+    name: "김우빈",
+    genderRaw: Gender.male.rawValue,
+    birthDate: calendar.date(from: DateComponents(year: 1988, month: 1, day: 1))!,
+    createdAt: now,
+    updatedAt: now
+  )
+  let op1 = SDOperation(
+    id: UUID().uuidString,
+    title: "간 종양 절제",
+    diagnosis: sharedDiagnosis,
+    surgeon: "오남기",
+    surgicalSite: sharedSurgicalSite,
+    date: now,
+    details: sharedDetails,
+    statusRaw: OperationStatus.planned.rawValue
+  )
+  op1.patient = patient1
+  if !modelData.isEmpty {
+    let asset1 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelData)
+    asset1.operation = op1
+    op1.assets = [asset1]
+  }
+  patient1.operations = [op1]
+
+  // 환자 2: 김남길 (27세, 남) — patientNumber: 1542
+  let patient2 = SDPatient(
+    id: UUID().uuidString,
+    patientNumber: "1542",
+    name: "김남길",
+    genderRaw: Gender.male.rawValue,
+    birthDate: calendar.date(from: DateComponents(year: 1999, month: 1, day: 1))!,
+    createdAt: now,
+    updatedAt: now
+  )
+  let op2 = SDOperation(
+    id: UUID().uuidString,
+    title: "간 종양 절제",
+    diagnosis: sharedDiagnosis,
+    surgeon: "오남기",
+    surgicalSite: sharedSurgicalSite,
+    date: now,
+    details: sharedDetails,
+    statusRaw: OperationStatus.planned.rawValue
+  )
+  op2.patient = patient2
+  if !modelData.isEmpty {
+    let asset2 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelData)
+    asset2.operation = op2
+    op2.assets = [asset2]
+  }
+  patient2.operations = [op2]
+
+  // 환자 3: 이나연 (26세, 여) — patientNumber: 1325
+  let patient3 = SDPatient(
+    id: UUID().uuidString,
+    patientNumber: "1325",
+    name: "이나연",
+    genderRaw: Gender.female.rawValue,
+    birthDate: calendar.date(from: DateComponents(year: 2000, month: 1, day: 1))!,
+    createdAt: now,
+    updatedAt: now
+  )
+  let op3 = SDOperation(
+    id: UUID().uuidString,
+    title: "간 종양 절제",
+    diagnosis: sharedDiagnosis,
+    surgeon: "오남기",
+    surgicalSite: sharedSurgicalSite,
+    date: now,
+    details: sharedDetails,
+    statusRaw: OperationStatus.planned.rawValue
+  )
+  op3.patient = patient3
+  if !modelData.isEmpty {
+    let asset3 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelData)
+    asset3.operation = op3
+    op3.assets = [asset3]
+  }
+  patient3.operations = [op3]
+
+  // 환자 4: 김남길 (28세, 남) — patientNumber: 1651
+  let patient4 = SDPatient(
+    id: UUID().uuidString,
+    patientNumber: "1651",
+    name: "김남길",
+    genderRaw: Gender.male.rawValue,
+    birthDate: calendar.date(from: DateComponents(year: 1998, month: 1, day: 1))!,
+    createdAt: now,
+    updatedAt: now
+  )
+  let op4 = SDOperation(
+    id: UUID().uuidString,
+    title: "간 종양 절제",
+    diagnosis: sharedDiagnosis,
+    surgeon: "오남기",
+    surgicalSite: sharedSurgicalSite,
+    date: now,
+    details: sharedDetails,
+    statusRaw: OperationStatus.planned.rawValue
+  )
+  op4.patient = patient4
+  if !modelData.isEmpty {
+    let asset4 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelData)
+    asset4.operation = op4
+    op4.assets = [asset4]
+  }
+  patient4.operations = [op4]
+
+  for patient in [patient1, patient2, patient3, patient4] {
+    context.insert(patient)
+  }
+
+  try? context.save()
+  print("🌱 Demo data seeded: 4 patients with 간 종양 절제 operations (surgeon: 오남기)")
+}
+#endif

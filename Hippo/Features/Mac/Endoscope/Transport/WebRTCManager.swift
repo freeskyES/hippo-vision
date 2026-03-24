@@ -301,11 +301,19 @@ public final class WebRTCManager: NSObject, IVideoTransport {
     }
 
     /// Create and send a new WebRTC offer (public for renegotiation)
+    /// When called for renegotiation (receiver joined late), restarts ICE to re-gather candidates.
     public func createOffer() {
         print("[WebRTCManager] Creating offer (signaling state: \(signalingClient?.state.self ?? .disconnected))")
 
+        // ICE restart: 기존 ICE candidates가 유실된 경우 (receiver가 늦게 연결)
+        // restartIce()로 ICE gathering을 재시작하여 새 candidates 생성
+        peerConnection?.restartIce()
+        pendingRemoteCandidates.removeAll()
+        remoteDescriptionSet = false
+        logger.info("[WebRTCManager] ICE restart triggered for renegotiation")
+
         let constraints = LKRTCMediaConstraints(
-            mandatoryConstraints: nil,
+            mandatoryConstraints: ["IceRestart": "true"],
             optionalConstraints: ["OfferToReceiveVideo": "false"]
         )
 
@@ -549,6 +557,7 @@ public final class WebRTCManager: NSObject, IVideoTransport {
 
     /// Handle remote ICE candidate (called by ViewModel)
     public func handleRemoteCandidate(candidate: String, sdpMid: String?, sdpMLineIndex: Int32) {
+        logger.info("ICE:remote-candidate: \(candidate)")
         let iceCandidate = LKRTCIceCandidate(sdp: candidate, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
 
         if remoteDescriptionSet {
@@ -594,6 +603,7 @@ extension WebRTCManager: LKRTCPeerConnectionDelegate {
     }
 
     public func peerConnection(_ peerConnection: LKRTCPeerConnection, didGenerate candidate: LKRTCIceCandidate) {
+        logger.info("ICE:local-candidate: \(candidate.sdp)")
         signalingClient?.send(iceCandidate: candidate)
     }
 
@@ -604,10 +614,18 @@ extension WebRTCManager: LKRTCPeerConnectionDelegate {
     public func peerConnection(_ peerConnection: LKRTCPeerConnection, didAdd stream: LKRTCMediaStream) {}
     public func peerConnection(_ peerConnection: LKRTCPeerConnection, didRemove stream: LKRTCMediaStream) {}
     public func peerConnectionShouldNegotiate(_ peerConnection: LKRTCPeerConnection) {}
-    public func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCPeerConnectionState) {}
+    public func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCPeerConnectionState) {
+        let names = ["new", "connecting", "connected", "disconnected", "failed", "closed"]
+        let name = newState.rawValue < names.count ? names[Int(newState.rawValue)] : "unknown(\(newState.rawValue))"
+        logger.info("PEER_STATE: \(name)")
+    }
     public func peerConnection(_ peerConnection: LKRTCPeerConnection, didRemove candidates: [LKRTCIceCandidate]) {}
     public func peerConnection(_ peerConnection: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {}
-    public func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceGatheringState) {}
+    public func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceGatheringState) {
+        let names = ["new", "gathering", "complete"]
+        let name = newState.rawValue < names.count ? names[Int(newState.rawValue)] : "unknown(\(newState.rawValue))"
+        logger.info("GATHERING_STATE: \(name)")
+    }
     public func peerConnection(_ peerConnection: LKRTCPeerConnection, didAdd rtpReceiver: LKRTCRtpReceiver, streams mediaStreams: [LKRTCMediaStream]) {}
     public func peerConnection(_ peerConnection: LKRTCPeerConnection, didRemove rtpReceiver: LKRTCRtpReceiver) {}
     public func peerConnection(_ peerConnection: LKRTCPeerConnection, didStartReceivingOn transceiver: LKRTCRtpTransceiver) {}

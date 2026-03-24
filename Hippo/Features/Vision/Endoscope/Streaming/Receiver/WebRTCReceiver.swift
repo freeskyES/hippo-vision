@@ -292,8 +292,10 @@ public final class WebRTCReceiver: NSObject, ObservableObject {
 
         let rtcConfig = LKRTCConfiguration()
         rtcConfig.sdpSemantics = .unifiedPlan
+        rtcConfig.continualGatheringPolicy = .gatherContinually
         let stunServer = LKRTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"])
         rtcConfig.iceServers = [stunServer]
+        logger.info("ICE config: iceServers=[stun.l.google.com], gathering=continually")
 
         let constraints = LKRTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
 
@@ -501,6 +503,9 @@ public final class WebRTCReceiver: NSObject, ObservableObject {
 
             try await peerConnection.setLocalDescription(sdp)
             logger.info("SDP:setLocalDescription(answer) success")
+            logger.info("ICE gathering state after setLocal: \(peerConnection.iceGatheringState.rawValue)")
+            logger.info("ICE connection state: \(peerConnection.iceConnectionState.rawValue)")
+            logger.info("Signaling state: \(peerConnection.signalingState.rawValue)")
 
             signalingClient?.send(answer: sdp.sdp)
             logger.info("SIGNAL_TX:answer")
@@ -568,16 +573,18 @@ extension WebRTCReceiver: LKRTCPeerConnectionDelegate {
 
     nonisolated public func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceGatheringState) {
         Task { @MainActor in
-            self.logger.info("GATHERING_STATE:\(newState.rawValue)")
+            let stateNames = ["new", "gathering", "complete"]
+            let stateName = newState.rawValue < stateNames.count ? stateNames[Int(newState.rawValue)] : "unknown(\(newState.rawValue))"
+            self.logger.info("GATHERING_STATE:\(newState.rawValue) (\(stateName))")
         }
     }
 
     nonisolated public func peerConnection(_ peerConnection: LKRTCPeerConnection, didGenerate candidate: LKRTCIceCandidate) {
         Task { @MainActor [weak self] in
             guard let self = self else { return }
-            self.logger.info("ICE:local-candidate generated")
+            self.logger.info("ICE:local-candidate generated: \(candidate.sdp.prefix(80))")
             self.signalingClient?.send(iceCandidate: candidate)
-            self.logger.info("SIGNAL_TX:local-candidate")
+            self.logger.info("SIGNAL_TX:local-candidate sent")
         }
     }
 
