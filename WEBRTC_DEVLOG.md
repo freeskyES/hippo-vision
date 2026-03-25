@@ -126,10 +126,18 @@ Frame #7~:   Renderer ready: false   ← 렌더러가 데이터 수신 거부
 - **결과**: 동작 개선 (프레임이 표시됨), 하지만 여전히 레이턴시 큼
 - 15fps로 낮춰도 레이턴시 동일 → 프레임 처리량이 아닌 파이프라인 지연
 
-**남은 레이턴시 원인 (추정)**:
-1. Vision Pro에서 CMTaggedBuffer stereo 프레임 → RealityKit 렌더링 파이프라인 지연
-2. VTPixelTransferSession으로 SBS → left/right 분리 시 오버헤드
-3. WebRTC → HEVC 디코딩 → stereo 분리 → enqueue → 렌더링 체인이 김
+**남은 레이턴시 원인 (확인됨, 2026-03-25)**:
+
+| 병목 | 설명 | 심각도 |
+|------|------|--------|
+| `processingQueue.sync` | stereo 처리가 동기 큐에서 실행 → 호출 스레드 블로킹 | 높음 |
+| VTPixelTransfer ×2 | SBS→left/right 분리에 CPU pixel transfer 2회 실행 | 중간 |
+| Renderer stereo 소비 | 실기기에서 CMTaggedBuffer stereo 처리가 mono 대비 매우 느림 | 높음 |
+| NV12 버퍼 ×2 생성 | 매 프레임마다 left/right용 CVPixelBuffer 2개 할당 | 낮음 |
+| CMReadySampleBuffer 변환 | CMTaggedDynamicBuffer → CMReadySampleBuffer → withUnsafeSampleBuffer | 낮음 |
+
+2D vs 3D 비교: 2D는 VTPixelTransfer 1회 + 단일 프레임 enqueue. 3D는 2회 + tagged 프레임.
+15fps로 낮춰도 개선 없음 → 프레임 수가 아닌 **프레임당 처리 비용**이 원인
 
 **향후 최적화 방향**:
 - [ ] Option A: ImmersiveSpace에서 stereo 렌더링 (RealityKit stereo pipeline 활용)
