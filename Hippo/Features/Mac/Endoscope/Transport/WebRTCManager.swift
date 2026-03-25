@@ -128,15 +128,15 @@ public final class WebRTCManager: NSObject, IVideoTransport {
             print("[WebRTCManager] WebRTC already initialized, skipping SSL/tracer setup")
         }
 
-        // Use default H.264 encoder (Galaxy XR requires CABAC — HEVC not supported by browser/receiver)
-        let encoderFactory = LKRTCDefaultVideoEncoderFactory()
+        // Use HEVC encoder for Vision Pro (better compression)
+        let encoderFactory = HEVCVideoEncoderFactory()
         let decoderFactory = LKRTCDefaultVideoDecoderFactory()
 
         peerConnectionFactory = LKRTCPeerConnectionFactory(
             encoderFactory: encoderFactory,
             decoderFactory: decoderFactory
         )
-        print("[WebRTCManager] Peer connection factory created with H.264 support")
+        print("[WebRTCManager] Peer connection factory created with HEVC support")
 
         // 2. Create peer connection
         print("[WebRTCManager] Creating peer connection...")
@@ -301,12 +301,10 @@ public final class WebRTCManager: NSObject, IVideoTransport {
     }
 
     /// Create and send a new WebRTC offer (public for renegotiation)
-    /// When called for renegotiation (receiver joined late), restarts ICE to re-gather candidates.
     public func createOffer() {
         print("[WebRTCManager] Creating offer (signaling state: \(signalingClient?.state.self ?? .disconnected))")
 
-        // ICE restart: 기존 ICE candidates가 유실된 경우 (receiver가 늦게 연결)
-        // restartIce()로 ICE gathering을 재시작하여 새 candidates 생성
+        // Re-gather ICE candidates for new offer (필수: receiver가 늦게 연결된 경우)
         peerConnection?.restartIce()
         pendingRemoteCandidates.removeAll()
         remoteDescriptionSet = false

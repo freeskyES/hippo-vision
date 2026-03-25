@@ -292,10 +292,9 @@ public final class WebRTCReceiver: NSObject, ObservableObject {
 
         let rtcConfig = LKRTCConfiguration()
         rtcConfig.sdpSemantics = .unifiedPlan
-        rtcConfig.continualGatheringPolicy = .gatherContinually
         let stunServer = LKRTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"])
         rtcConfig.iceServers = [stunServer]
-        logger.info("ICE config: iceServers=[stun.l.google.com], gathering=continually")
+        logger.info("ICE config: iceServers=[stun.l.google.com]")
 
         let constraints = LKRTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
 
