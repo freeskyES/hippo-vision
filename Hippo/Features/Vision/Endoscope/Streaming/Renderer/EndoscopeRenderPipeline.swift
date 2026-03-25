@@ -646,8 +646,14 @@ public final class EndoscopeRenderPipeline: ObservableObject {
             await MainActor.run { [weak self] in
                 guard let self = self else { return }
                 self.framesSkipped += 1
-                // Log backpressure periodically
-                if self.framesSkipped % 30 == 0 || self.framesSkipped < 5 {
+
+                // Recovery: if renderer is stuck for too long, flush and retry
+                if self.framesSkipped >= 10 && self.framesSkipped % 30 == 0 {
+                    self.logger.warning("🔧 [Stereo3D] Renderer stuck (\(self.framesSkipped) frames skipped), flushing...")
+                    player.videoRenderer.flush()
+                    self.framesSkipped = 0
+                    self.logger.warning("✅ [Stereo3D] Renderer flushed, ready for new frames")
+                } else if self.framesSkipped % 30 == 0 || self.framesSkipped < 5 {
                     let skipRate = Double(self.framesSkipped) / Double(frames) * 100
                     self.logger.warning("[Stereo3D] Backpressure: \(self.framesSkipped) frames skipped (\(String(format: "%.1f", skipRate))%)")
                 }

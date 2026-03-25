@@ -111,10 +111,17 @@ Frame #7~:   Renderer ready: false   ← 렌더러가 데이터 수신 거부
 
 **결론**: CMTaggedBuffer stereo는 ImmersiveSpace에서만 동작. WindowGroup에서는 실기기가 stereo tag를 처리하지 못해 6프레임 후 renderer가 멈춤.
 
-**해결 방향**:
-- [ ] Option A: Stereo3DView를 ImmersiveSpace로 이동 (원본과 동일 구조, 추천)
-- [ ] Option B: Mac에서 MV-HEVC 인코딩 후 전송 (Apple 정석 방식)
-- [ ] Option C: WindowGroup에서는 2D SBS만 지원 (fallback)
+**임시 해결 (2026-03-25)**: renderer flush 복구 메커니즘 추가
+- renderer가 30프레임 이상 stuck되면 자동 flush → 복구 → 프레임 재수신
+- **결과**: 3D 영상 표시 성공! 단, 실질 ~5-6fps (6프레임 enqueue → 30프레임 스킵 → flush 반복)
+- **레이턴시**: 매우 큼 — 해상도를 많이 낮춰도 개선 안 됨 → Vision Pro 렌더링 파이프라인 한계
+- **참고**: 원본 프로젝트도 동일한 코드/구조 (WindowGroup). 원래 3D가 실기기에서 완벽하지 않았음
+
+**향후 최적화 방향**:
+- [ ] Option A: ImmersiveSpace에서 stereo 렌더링 (RealityKit stereo pipeline 활용)
+- [ ] Option B: Mac에서 MV-HEVC 인코딩 후 전송 (Apple 정석 방식, Vision Pro 전용 — Galaxy XR 미지원)
+- [ ] Option C: stereo 모드 프레임레이트 제한 (15fps) — renderer 부하 감소
+- [ ] Option D: CMTaggedDynamicBuffer → CMTaggedBuffer 변환 시도 (Apple 샘플과 동일한 타입)
 
 ### 레이턴시 관련 메모
 
