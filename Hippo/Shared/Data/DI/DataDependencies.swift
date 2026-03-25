@@ -79,7 +79,10 @@ private enum PatientModelContainerKey: DependencyKey {
 
       // MARK: - 🧪 Demo Data Seeding (DELETE THIS BLOCK WHEN NO LONGER NEEDED)
       #if DEBUG
-      seedDemoDataIfEmpty(context: container.mainContext)
+      let mainContext = container.mainContext
+      Task { @MainActor in
+        seedDemoDataIfEmpty(context: mainContext)
+      }
       #endif
 
       return container

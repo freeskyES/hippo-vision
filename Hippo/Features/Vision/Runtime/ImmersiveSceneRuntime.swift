@@ -142,6 +142,9 @@ final class ImmersiveSceneRuntime {
         logger.debug("🐛 ImmersiveSceneRuntime stopped")
         topAnchor = nil
 
+        // AR 세션 정리 (timer + world tracking 해제)
+        ARSessionController.shared.stopARSession()
+
         // 제스쳐 이벤트 구독 정리
         eventSubscription?.cancel()
     }

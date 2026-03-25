@@ -63,7 +63,50 @@ Vision Pro → Mac은 HEVC 인코더 필수 (H.264 시 ICE 실패)
 
 - **상태**: ❌ 실기기에서 멈춤 (영상 표시 안 됨)
 - 시뮬레이터에서는 정상 동작
-- 원인 미확인 — 추가 디버깅 필요
+
+#### 3D 멈춤 원인 분석 (2026-03-25)
+
+**증상**: Split SBS(2D) → Stereo 3D 전환 후 첫 6프레임만 표시되고 멈춤
+
+**로그 증거**:
+```
+Frame #1~#6: Renderer ready: true    ← 6프레임 정상 enqueue
+Frame #7~:   Renderer ready: false   ← 렌더러가 데이터 수신 거부
+[Stereo3D] Backpressure: 30 frames skipped (272.7%)
+[Stereo3D] Backpressure: 60 frames skipped (146.3%)
+[Debug 1~5/10] Renderer not ready for data  ← 영구적으로 복구 안 됨
+```
+
+**원인 체인**:
+1. `ImmersiveSceneRuntime stopped` — 3D 전환 전에 Immersive Space가 이미 종료됨
+2. RealityKit이 VideoPlayerComponent의 프레임을 소비할 수 없음 (렌더링 공간 없음)
+3. AVSampleBufferVideoRenderer 내부 버퍼가 6프레임으로 가득 참
+4. `ready: false` → 모든 후속 프레임 backpressure 스킵 → 화면 멈춤
+
+**시뮬레이터에서 되는 이유**: 시뮬레이터는 Immersive Space 생명주기가 다르게 동작하여 renderer가 프레임을 계속 소비함
+
+**수정 1 (2026-03-25)**: `ImmersiveSceneRuntime.stop()`에 `ARSessionController.shared.stopARSession()` 추가
+- AR tracking timer가 runtime 종료 후에도 계속 돌면서 에러 폭발하던 문제 해결
+- `ar_world_tracking_provider` 에러 완전 제거됨
+- **하지만 3D 멈춤은 여전히 발생** → AR tracking은 부수적 문제였음
+
+**추가 분석 (2026-03-25)**:
+- stereo frame 생성 코드 확인: `CMTaggedDynamicBuffer` + `CMStereoViewComponents` 방식 사용 (정상)
+- left/right eye tagging, videoLayerID 설정 모두 정상
+- 6프레임까지 `Renderer ready: true`로 정상 enqueue됨
+- 7프레임부터 `ready: false` → renderer가 프레임을 소비하지 못함
+- `Dimensions: 0×0`으로 보고됨 — sample buffer의 format description 이슈 가능
+- **시뮬레이터에서는 같은 코드가 정상 동작** → 실기기의 VideoPlayerComponent 렌더링 파이프라인 차이
+
+**의심 원인**:
+1. 실기기에서 CMTaggedBuffer 기반 stereo가 WindowGroup에서 제대로 소비되지 않을 수 있음
+2. 원본 프로젝트에서는 MV-HEVC 변환 후 VideoToolbox로 플레이했을 가능성
+3. Immersive Space가 아닌 일반 Window에서 stereo 렌더링 시 실기기 제약이 있을 수 있음
+
+**다음 단계**:
+- [ ] 원본 프로젝트의 3D 렌더링 방식 확인 (MV-HEVC 사용 여부)
+- [ ] WindowGroup vs ImmersiveSpace에서의 stereo 렌더링 차이 확인
+- [ ] `Dimensions: 0×0` 문제 — CMFormatDescription 생성 시 실제 해상도가 들어가는지 확인
 
 ### 레이턴시 관련 메모
 
@@ -94,10 +137,11 @@ Vision Pro → Mac은 HEVC 인코더 필수 (H.264 시 ICE 실패)
 
 ## 미해결 이슈
 
-### 1. Vision Pro 3D 모드 실기기 멈춤
-- 시뮬레이터에서는 동작하나 실기기에서 영상이 멈춤
-- 2D(Split SBS)는 정상
-- 원인 탐구 필요
+### 1. Vision Pro 3D 모드 실기기 멈춤 — 원인 특정됨
+- **근본 원인**: `ImmersiveSceneRuntime stopped` → Immersive Space가 종료되어 렌더러가 프레임을 소비하지 못함
+- 6프레임 enqueue 후 renderer buffer 가득 참 → `ready: false` 영구화
+- 2D(Split SBS, Raw Stream)는 정상 (Immersive Space 불필요)
+- **TODO**: ImmersiveSceneRuntime stop 원인 코드 분석
 
 ### 2. 인코더 동적 전환 미구현
 - 현재 Galaxy XR / Vision Pro 별도 브랜치로 관리

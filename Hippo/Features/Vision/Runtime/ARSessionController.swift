@@ -49,8 +49,10 @@ final class ARSessionController {
                 // 디바이스 위치 0.1초 간격으로 업데이트
                 self.timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
                     Task.detached {
+                        guard let worldTracking = await self.worldTracking,
+                              await self.session != nil else { return }
                         let now = CACurrentMediaTime()
-                        if let dev = await self.worldTracking?.queryDeviceAnchor(atTimestamp: now) {
+                        if let dev = worldTracking.queryDeviceAnchor(atTimestamp: now) {
                             let t = dev.originFromAnchorTransform
                             await MainActor.run { self.deviceTransform = t }
                         }
