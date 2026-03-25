@@ -117,11 +117,25 @@ Frame #7~:   Renderer ready: false   ← 렌더러가 데이터 수신 거부
 - **레이턴시**: 매우 큼 — 해상도를 많이 낮춰도 개선 안 됨 → Vision Pro 렌더링 파이프라인 한계
 - **참고**: 원본 프로젝트도 동일한 코드/구조 (WindowGroup). 원래 3D가 실기기에서 완벽하지 않았음
 
+**추가 수정 (2026-03-25)**: `DisplayImmediately` 추가
+- 3D stereo 경로(`enqueueSample`)에 `kCMSampleAttachmentKey_DisplayImmediately = true` 설정
+- **원인**: synchronizer가 `time: .zero`에서 시작하나 프레임 PTS가 `CACurrentMediaTime` (~수천초)
+  → synchronizer가 해당 시간에 도달할 때까지 프레임을 버퍼에 쌓기만 하고 표시하지 않음
+  → 6프레임(버퍼 용량) 후 `ready: false` → 표시도 소비도 안 됨
+- 2D 경로에는 이미 있었으나 3D 경로에 누락되어 있었음
+- **결과**: 동작 개선 (프레임이 표시됨), 하지만 여전히 레이턴시 큼
+- 15fps로 낮춰도 레이턴시 동일 → 프레임 처리량이 아닌 파이프라인 지연
+
+**남은 레이턴시 원인 (추정)**:
+1. Vision Pro에서 CMTaggedBuffer stereo 프레임 → RealityKit 렌더링 파이프라인 지연
+2. VTPixelTransferSession으로 SBS → left/right 분리 시 오버헤드
+3. WebRTC → HEVC 디코딩 → stereo 분리 → enqueue → 렌더링 체인이 김
+
 **향후 최적화 방향**:
 - [ ] Option A: ImmersiveSpace에서 stereo 렌더링 (RealityKit stereo pipeline 활용)
-- [ ] Option B: Mac에서 MV-HEVC 인코딩 후 전송 (Apple 정석 방식, Vision Pro 전용 — Galaxy XR 미지원)
-- [ ] Option C: stereo 모드 프레임레이트 제한 (15fps) — renderer 부하 감소
-- [ ] Option D: CMTaggedDynamicBuffer → CMTaggedBuffer 변환 시도 (Apple 샘플과 동일한 타입)
+- [ ] Option B: Mac에서 MV-HEVC 인코딩 후 전송 (Apple 정석, Vision Pro 전용 — Galaxy XR 미지원)
+- [ ] Option C: stereo 분리를 GPU(Metal)로 처리 (VTPixelTransferSession 대체)
+- [ ] Option D: synchronizer 타임라인을 첫 프레임 PTS에 맞추기 (DisplayImmediately 대신)
 
 ### 레이턴시 관련 메모
 
