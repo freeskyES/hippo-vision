@@ -163,6 +163,15 @@ public final class StereoVideoPlayer {
             }
         }
 
+        // Set display immediately - synchronizer timing doesn't work with synthetic PTS
+        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true) {
+            let arr = attachments as NSArray
+            if let dict = arr.firstObject as? NSMutableDictionary {
+                dict[kCMSampleAttachmentKey_DisplayImmediately] = true
+                dict[kCMSampleAttachmentKey_DoNotDisplay] = false
+            }
+        }
+
         // Enqueue to renderer
         videoRenderer.enqueue(sample)
         framesEnqueued += 1
