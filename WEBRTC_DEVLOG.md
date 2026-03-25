@@ -103,10 +103,18 @@ Frame #7~:   Renderer ready: false   ← 렌더러가 데이터 수신 거부
 2. 원본 프로젝트에서는 MV-HEVC 변환 후 VideoToolbox로 플레이했을 가능성
 3. Immersive Space가 아닌 일반 Window에서 stereo 렌더링 시 실기기 제약이 있을 수 있음
 
-**다음 단계**:
-- [ ] 원본 프로젝트의 3D 렌더링 방식 확인 (MV-HEVC 사용 여부)
-- [ ] WindowGroup vs ImmersiveSpace에서의 stereo 렌더링 차이 확인
-- [ ] `Dimensions: 0×0` 문제 — CMFormatDescription 생성 시 실제 해상도가 들어가는지 확인
+**조사 결과 (2026-03-25)**:
+
+1. **원본 프로젝트**: CMTaggedBuffer 방식 + **ImmersiveSpace**에서 렌더링 + HeroEye attachment 있음
+2. **Apple 샘플**: MV-HEVC 인코딩 방식 (VideoToolbox, kVTCompressionPropertyKey_MVHEVCVideoLayerIDs)
+3. **현재 프로젝트**: CMTaggedBuffer 방식이지만 **WindowGroup**에서 렌더링 → 실기기에서 지원 안 됨
+
+**결론**: CMTaggedBuffer stereo는 ImmersiveSpace에서만 동작. WindowGroup에서는 실기기가 stereo tag를 처리하지 못해 6프레임 후 renderer가 멈춤.
+
+**해결 방향**:
+- [ ] Option A: Stereo3DView를 ImmersiveSpace로 이동 (원본과 동일 구조, 추천)
+- [ ] Option B: Mac에서 MV-HEVC 인코딩 후 전송 (Apple 정석 방식)
+- [ ] Option C: WindowGroup에서는 2D SBS만 지원 (fallback)
 
 ### 레이턴시 관련 메모
 
