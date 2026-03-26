@@ -57,14 +57,121 @@ CVPixelBufferPool 적용 | 2D 거의 실시간 달성
 flush 주기 30→2프레임 | 3D 끊김 간격 대폭 감소
 DisplayImmediately → synchronizer PTS 동기화 | 3D 자연스러운 영상 흐름 달성
 
+### 상세 로그 & 근거
+
+#### 1. CVPixelBufferPool이 왜 효과적이었나
+
+변경 전: 매 프레임 `CVPixelBufferCreate()` 호출. 3D는 left/right 2개라 프레임당 2회.
+
+```swift
+// Before — 매번 새 버퍼 할당 (OS에 메모리 요청 → 할당 → 초기화)
+var buffer: CVPixelBuffer?
+CVPixelBufferCreate(kCFAllocatorDefault, width, height, format, attrs, &buffer)
+```
+
+```swift
+// After — Pool에서 재사용 (이미 할당된 버퍼 반환, OS 호출 없음)
+CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer)
+```
+
+30fps × 2버퍼 = 초당 60회 OS 메모리 할당이 Pool 재사용으로 바뀌니, 2D는 레이턴시가 체감 불가 수준으로 줄었다. 3D도 개선됐지만 다른 병목(synchronizer 타이밍)이 더 컸다.
+
+#### 2. 3D flush 사이클 — 로그 근거
+
+실기기 로그에서 명확하게 보이는 패턴:
+
+```
+Frame #1~#6: Renderer ready: true    ← 6프레임 정상 enqueue
+Frame #7:    Renderer ready: false   ← stuck 시작
+Frame #8:    Renderer ready: false   ← skip
+(flush 후)
+Frame #9:    Renderer ready: true    ← 복구!
+Frame #10:   Renderer ready: true    ← 계속 진행
+```
+
+- renderer 내부 버퍼 용량이 약 6프레임
+- 프레임이 표시(소비)되지 않으면 버퍼가 차서 `ready: false`
+- `flush()`로 버퍼를 비우면 즉시 `ready: true`로 복구
+- flush 주기가 길수록(30프레임) 끊김이 길고, 짧을수록(2프레임) 끊김이 짧음
+
+#### 3. DisplayImmediately vs synchronizer — 왜 슬라이드쇼가 됐나
+
+`DisplayImmediately = true`는 "PTS 무시하고 즉시 표시하라"는 의미다. 문제는 renderer가 `ready: true`인 동안 6프레임을 한번에 받아서 한번에 표시한다는 것:
+
+```
+[시간 0ms]   Frame 1,2,3,4,5,6 → 한꺼번에 표시 (거의 동시에)
+[시간 66ms]  Frame 7,8 → skip (ready: false)
+[시간 100ms] flush → ready: true
+[시간 100ms] Frame 9,10,11,12,13,14 → 한꺼번에 표시
+...반복
+```
+
+사용자 눈에는: 6장 한번에 → 빈 구간 → 6장 한번에. 마치 애니메이션 프레임을 넘기는 것처럼 보인다.
+
+#### 4. synchronizer PTS 동기화 — 왜 이게 해결인가
+
+synchronizer는 "시계"다. 프레임의 PTS와 synchronizer의 시계를 맞추면, renderer가 33ms마다 한 프레임씩 꺼내서 표시한다.
+
+```
+synchronizer 시작: time = 0초
+프레임 PTS:        time = 9589초
+
+→ synchronizer가 9589초에 도달해야 프레임 표시
+→ 실시간으로 9589초 걸림 (약 2.6시간)
+→ 그 동안 프레임은 버퍼에 쌓이기만 함 → 6개 차면 ready: false
+```
+
+해결:
+
+```swift
+// 첫 프레임의 PTS에 synchronizer 시계를 맞춤
+synchronizer.setRate(1.0, time: firstFramePTS)
+// → synchronizer 시계 = 9589초에서 시작
+// → 프레임 PTS 9589.000, 9589.033, 9589.067... 순서대로 33ms 간격으로 표시
+```
+
+flush 후에는 `resetEnqueueCounter()`로 다음 프레임에서 synchronizer를 재동기화한다.
+
+#### 5. Galaxy XR이 더 부드러운 이유 — 코드 기반 근거
+
+이건 직접 체험이 아니라 코드 분석과 로그에서 추론한 것이다.
+
+Vision Pro 3D 경로 (코드에서 확인):
+```
+HEVC 비트스트림
+  → LiveKitWebRTC SW 디코더 (CPU)          ← CPU 작업 1
+  → CVPixelBuffer (CPU 메모리)
+  → VTPixelTransferSession #1: left crop   ← CPU 작업 2
+  → VTPixelTransferSession #2: right crop  ← CPU 작업 3
+  → CVPixelBuffer 2개 생성                 ← 메모리 할당
+  → CMTaggedBuffer 태깅                    ← CPU 작업 4
+  → CMSampleBuffer 생성                    ← CPU 작업 5
+  → AVSampleBufferVideoRenderer enqueue
+  → RealityKit 소비 → 디스플레이
+```
+
+Galaxy XR 3D 경로 (코드에서 확인):
+```kotlin
+// StereoHwDecoder.kt
+mediaCodec.configure(format, surface, null, 0)  // Surface에 직접 출력
+```
+```
+H.264 비트스트림
+  → MediaCodec HW 디코더 (전용 칩)         ← HW 작업 (CPU 불필요)
+  → Surface (GPU 메모리, zero-copy)
+  → SpatialExternalSurface(SBS 자동 분리)   ← HW 자동
+  → 디스플레이
+```
+
+Galaxy XR은 CPU가 프레임 데이터를 한번도 만지지 않는다. Vision Pro는 최소 5번 CPU 작업이 필요하다.
+
+비유: Galaxy XR은 컨베이어 벨트(물건이 올라가면 끝까지 자동). Vision Pro는 사람이 중간에서 물건을 받아, 반으로 자르고, 라벨 붙이고, 다음 벨트에 올리는 구조. 사람(CPU)이 병목.
+
+단, VTPixelTransferSession이 실제로 GPU 가속을 쓰는지 CPU에서만 도는지는 Apple이 명시하지 않아 프로파일링 없이 확정 불가.
+
 ### 남은 과제
 
-3D는 동작하지만 완전히 매끄럽지는 않다. Vision Pro의 stereo 처리 파이프라인이 Galaxy XR 대비 무겁기 때문이다.
-
-- Vision Pro: SW 디코딩 → CPU에서 SBS 분리(VTPixelTransfer x2) → CMTaggedBuffer 태깅 → enqueue
-- Galaxy XR: HW 디코딩 → Surface에 zero-copy → SpatialExternalSurface가 SBS 자동 분리
-
-향후 Phase 2(ImmersiveSpace 렌더링), Phase 3(CompositorServices + Metal)으로 추가 개선 가능. 해상도/파이프라인 스펙 상세는 `RESOLUTION_SPEC.md` 참조.
+3D는 동작하지만 완전히 매끄럽지는 않다. 향후 Phase 2(ImmersiveSpace 렌더링), Phase 3(CompositorServices + Metal)으로 추가 개선 가능. 해상도/파이프라인 스펙 상세는 `RESOLUTION_SPEC.md` 참조.
 
 ---
 
