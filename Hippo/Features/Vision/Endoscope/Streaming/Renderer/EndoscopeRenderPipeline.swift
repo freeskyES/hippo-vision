@@ -642,23 +642,23 @@ public final class EndoscopeRenderPipeline: ObservableObject {
         }
 
         guard isReady else {
-            // Renderer is busy, skip this frame to prevent queue buildup
+            // Renderer is busy — aggressive flush for real-time stereo
             await MainActor.run { [weak self] in
                 guard let self = self else { return }
                 self.framesSkipped += 1
 
-                // Recovery: if renderer is stuck for too long, flush and retry
-                if self.framesSkipped >= 10 && self.framesSkipped % 30 == 0 {
-                    self.logger.warning("🔧 [Stereo3D] Renderer stuck (\(self.framesSkipped) frames skipped), flushing...")
+                // Aggressive recovery: flush every 6 skipped frames (~200ms at 30fps)
+                // Stereo renderer on real device only consumes ~6 frames before stalling
+                if self.framesSkipped >= 6 {
                     player.videoRenderer.flush()
                     self.framesSkipped = 0
-                    self.logger.warning("✅ [Stereo3D] Renderer flushed, ready for new frames")
-                } else if self.framesSkipped % 30 == 0 || self.framesSkipped < 5 {
-                    let skipRate = Double(self.framesSkipped) / Double(frames) * 100
-                    self.logger.warning("[Stereo3D] Backpressure: \(self.framesSkipped) frames skipped (\(String(format: "%.1f", skipRate))%)")
                 }
             }
             return
+        }
+        // Reset skip counter on successful enqueue
+        await MainActor.run { [weak self] in
+            self?.framesSkipped = 0
         }
 
         let srcWidth = CVPixelBufferGetWidth(pixelBuffer)
