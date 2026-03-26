@@ -1,6 +1,74 @@
 # WebRTC 개발일지
 
-## 프로젝트 현황 (2026-03-25)
+---
+
+## 2026-03-26: 3D Stereo, 드디어 자연스럽게 흘러나오다
+
+어제(3/25) WebRTC 연결을 복구하고 3D를 겨우 표시하는 데 성공했지만, 영상이 뚝뚝 끊기고 레이턴시가 심했다. 오늘은 그 문제를 파고들어 실질적인 개선을 이뤄냈다.
+
+### CVPixelBufferPool — 2D가 실시간이 됐다
+
+매 프레임마다 `CVPixelBufferCreate()`를 호출해서 left/right eye 버퍼를 새로 할당하고 있었다. 3D 모드에서는 프레임당 2번씩. `CVPixelBufferPool`로 바꾸니 **2D 레이턴시가 체감 불가 수준으로 줄었다**. 거의 실시간. 3D도 개선됐지만 여전히 끊김이 있었다.
+
+### 3D 끊김의 정체 — flush 사이클
+
+3D의 끊김 패턴을 분석해보니 이런 구조였다:
+
+```
+6프레임 enqueue → renderer stuck → 30프레임 스킵 → flush → 다시 6프레임 → ...
+```
+
+renderer가 stereo tagged frame을 6개까지만 받고 멈춘다. flush해야 다시 받는다. 30프레임(~1초)을 기다린 뒤 flush하니까, 1초 분량의 영상이 통째로 빠지고 다음 장면이 갑자기 나타났다.
+
+flush 주기를 **30 → 6 → 2프레임**으로 줄이니 끊김 간격이 대폭 줄었다. "뚝——뚝——뚝" 에서 "딱딱딱딱"으로 바뀐 느낌.
+
+### DisplayImmediately의 함정
+
+하지만 여전히 자연스럽지 않았다. 15fps로 낮춰도 차이가 없었다. 프레임 수 문제가 아니라 뭔가 근본적인 게 잘못돼 있었다.
+
+2D 경로와 3D 경로를 비교해보니 결정적 차이를 발견했다:
+
+```
+2D: kCMSampleAttachmentKey_DisplayImmediately = true  ← 있음
+3D: (없음)
+```
+
+`DisplayImmediately`가 없으면 `AVSampleBufferRenderSynchronizer`가 프레임의 PTS 시간에 맞춰 표시한다. 그런데 synchronizer는 `time: .zero`에서 시작하고, 프레임 PTS는 `CACurrentMediaTime` 기준 ~9000초대다. synchronizer가 9000초에 도달할 때까지 프레임은 버퍼에 쌓이기만 하고 표시되지 않는다. 이게 6프레임 stuck의 진짜 원인이었다.
+
+그래서 `DisplayImmediately`를 3D 경로에도 추가했더니 동작은 했다. 하지만 6프레임이 한번에 뿌려지고 → 갭 → 다시 6프레임이 뿌려지는 패턴이었다. 마치 슬라이드쇼.
+
+### synchronizer 동기화 — 진짜 해결
+
+`DisplayImmediately`를 다시 제거하고, 대신 **첫 프레임의 PTS에 synchronizer를 동기화**했다:
+
+```swift
+synchronizer.setRate(1.0, time: firstFramePTS)
+```
+
+이러면 synchronizer가 프레임의 PTS 타임라인 위에서 시작한다. 프레임이 33ms 간격으로 자연스럽게 소비된다. flush 후에도 다음 프레임 PTS에 자동 재동기화되도록 `resetEnqueueCounter()`를 추가했다.
+
+**결과: 3D stereo 영상이 자연스럽게 흘러나왔다.**
+
+### 오늘의 변경 요약
+
+변경 | 효과
+--- | ---
+CVPixelBufferPool 적용 | 2D 거의 실시간 달성
+flush 주기 30→2프레임 | 3D 끊김 간격 대폭 감소
+DisplayImmediately → synchronizer PTS 동기화 | 3D 자연스러운 영상 흐름 달성
+
+### 남은 과제
+
+3D는 동작하지만 완전히 매끄럽지는 않다. Vision Pro의 stereo 처리 파이프라인이 Galaxy XR 대비 무겁기 때문이다.
+
+- Vision Pro: SW 디코딩 → CPU에서 SBS 분리(VTPixelTransfer x2) → CMTaggedBuffer 태깅 → enqueue
+- Galaxy XR: HW 디코딩 → Surface에 zero-copy → SpatialExternalSurface가 SBS 자동 분리
+
+향후 Phase 2(ImmersiveSpace 렌더링), Phase 3(CompositorServices + Metal)으로 추가 개선 가능. 해상도/파이프라인 스펙 상세는 `RESOLUTION_SPEC.md` 참조.
+
+---
+
+## 프로젝트 현황 (2026-03-26, updated)
 
 Mac 앱에서 카메라 영상을 WebRTC로 스트리밍하여 Vision Pro / Galaxy XR에서 수신하는 시스템.
 
@@ -8,9 +76,9 @@ Mac 앱에서 카메라 영상을 WebRTC로 스트리밍하여 Vision Pro / Gala
 
 | Receiver | 코덱 | 연결 상태 | 비고 |
 |----------|------|----------|------|
-| Vision Pro (실기기) | HEVC | ✅ 2D 동작, ❌ 3D 멈춤 | 시뮬레이터에서는 3D도 동작 |
+| Vision Pro (실기기) | HEVC | ✅ 2D 실시간, ✅ 3D 동작 | 3D 추가 최적화 여지 있음 |
 | Vision Pro (시뮬레이터) | HEVC | ✅ 2D/3D 동작 | |
-| Galaxy XR | H.264 | ✅ 동작 | 브라우저 기반 수신 |
+| Galaxy XR | H.264 | ✅ 동작 | HW zero-copy 파이프라인 |
 
 ---
 
