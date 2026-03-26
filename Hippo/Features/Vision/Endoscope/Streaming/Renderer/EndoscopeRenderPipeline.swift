@@ -650,7 +650,8 @@ public final class EndoscopeRenderPipeline: ObservableObject {
                 // Aggressive recovery: flush after 2 skipped frames (~66ms at 30fps)
                 // Minimizes stutter gap between flush cycles
                 if self.framesSkipped >= 2 {
-                    player.videoRenderer.flush()
+                    player.flushAndResetTiming()
+                    player.resetEnqueueCounter()  // Next frame will re-sync synchronizer
                     self.framesSkipped = 0
                 }
             }

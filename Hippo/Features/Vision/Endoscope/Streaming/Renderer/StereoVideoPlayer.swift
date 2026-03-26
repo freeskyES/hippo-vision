@@ -71,6 +71,11 @@ public final class StereoVideoPlayer {
         logger.info("Playback paused")
     }
 
+    /// Reset enqueue counter so next frame re-syncs the synchronizer timeline
+    func resetEnqueueCounter() {
+        framesEnqueued = 0
+    }
+
     /// Flush renderer and reset timing for seamless loop restart
     /// Resets synchronizer time to zero so new PTS(0) frames are not treated as "old"
     func flushAndResetTiming() {
@@ -163,12 +168,14 @@ public final class StereoVideoPlayer {
             }
         }
 
-        // Set display immediately - synchronizer timing doesn't work with synthetic PTS
-        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true) {
-            let arr = attachments as NSArray
-            if let dict = arr.firstObject as? NSMutableDictionary {
-                dict[kCMSampleAttachmentKey_DisplayImmediately] = true
-                dict[kCMSampleAttachmentKey_DoNotDisplay] = false
+        // Sync synchronizer timeline to first frame's PTS
+        // This allows the renderer to consume frames at proper 33ms intervals
+        // instead of DisplayImmediately which dumps all frames at once
+        if framesEnqueued == 0 {
+            let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+            if pts.isValid {
+                synchronizer.setRate(1.0, time: pts)
+                logger.info("🎯 Synchronizer synced to first stereo PTS: \(CMTimeGetSeconds(pts))s")
             }
         }
 
