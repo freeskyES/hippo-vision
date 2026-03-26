@@ -139,11 +139,25 @@ Frame #7~:   Renderer ready: false   ← 렌더러가 데이터 수신 거부
 2D vs 3D 비교: 2D는 VTPixelTransfer 1회 + 단일 프레임 enqueue. 3D는 2회 + tagged 프레임.
 15fps로 낮춰도 개선 없음 → 프레임 수가 아닌 **프레임당 처리 비용**이 원인
 
-**향후 최적화 방향**:
-- [ ] Option A: ImmersiveSpace에서 stereo 렌더링 (RealityKit stereo pipeline 활용)
-- [ ] Option B: Mac에서 MV-HEVC 인코딩 후 전송 (Apple 정석, Vision Pro 전용 — Galaxy XR 미지원)
-- [ ] Option C: stereo 분리를 GPU(Metal)로 처리 (VTPixelTransferSession 대체)
-- [ ] Option D: synchronizer 타임라인을 첫 프레임 PTS에 맞추기 (DisplayImmediately 대신)
+**향후 최적화 계획** (브랜치: `optimize/stereo-3d-latency`):
+
+Phase 1 — 즉시 적용, 낮은 리스크:
+- [ ] `processingQueue.sync` → async 처리 (호출 스레드 블로킹 제거)
+- [ ] CVPixelBufferPool 적용 (매 프레임 CVPixelBufferCreate ×2 → 재사용)
+
+Phase 2 — 중간 리스크:
+- [ ] 내시경 stereo를 ImmersiveSurgeryView 안에서 렌더링
+      (별도 WindowGroup 대신 surgery ImmersiveSpace 내에서 VideoPlayerComponent)
+
+Phase 3 — 높은 리스크, 최대 성능:
+- [ ] CompositorServices + Metal 렌더링 활성화
+      (EndoscopeImmersiveSpace.swift에 이미 placeholder 코드 있음)
+      M2에서 Metal 렌더링 시 메모리 이슈 있었으나, Vision Pro 자체 성능이므로 Mac 스펙과 무관
+
+참고:
+- MV-HEVC 인코딩은 Galaxy XR에서 미지원 → Vision Pro 전용이 됨
+- Metal 렌더링 부하는 Mac이 아니라 Vision Pro 쪽
+- CVPixelBufferPool은 과거에 사용한 적 있으나 현재 코드에서 누락됨
 
 ### 레이턴시 관련 메모
 
