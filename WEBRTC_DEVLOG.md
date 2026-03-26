@@ -141,9 +141,11 @@ Frame #7~:   Renderer ready: false   ← 렌더러가 데이터 수신 거부
 
 **향후 최적화 계획** (브랜치: `optimize/stereo-3d-latency`):
 
-Phase 1 — 즉시 적용, 낮은 리스크:
-- [ ] `processingQueue.sync` → async 처리 (호출 스레드 블로킹 제거)
-- [ ] CVPixelBufferPool 적용 (매 프레임 CVPixelBufferCreate ×2 → 재사용)
+Phase 1 — ✅ 완료 (2026-03-26):
+- [x] CVPixelBufferPool 적용 (매 프레임 CVPixelBufferCreate ×2 → Pool 재사용)
+- **2D 결과**: 레이턴시 체감 거의 없음! 대폭 개선
+- **3D 결과**: 동작하나 부분별로 끊김. 추가 개선 필요
+- `processingQueue.sync`는 이미 background 호출이라 실질 병목 아님 → 스킵
 
 Phase 2 — 중간 리스크:
 - [ ] 내시경 stereo를 ImmersiveSurgeryView 안에서 렌더링
