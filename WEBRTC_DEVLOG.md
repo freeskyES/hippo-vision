@@ -144,8 +144,17 @@ Frame #7~:   Renderer ready: false   ← 렌더러가 데이터 수신 거부
 Phase 1 — ✅ 완료 (2026-03-26):
 - [x] CVPixelBufferPool 적용 (매 프레임 CVPixelBufferCreate ×2 → Pool 재사용)
 - **2D 결과**: 레이턴시 체감 거의 없음! 대폭 개선
-- **3D 결과**: 동작하나 부분별로 끊김. 추가 개선 필요
-- `processingQueue.sync`는 이미 background 호출이라 실질 병목 아님 → 스킵
+- **3D 결과**: 동작하나 부분별로 끊김 → Phase 1.5에서 해결
+
+Phase 1.5 — ✅ 완료 (2026-03-26, 브랜치: `experiment/stereo-immersive-space`):
+- [x] flush 주기 단축: 30프레임 → 6프레임 → 2프레임
+- [x] `DisplayImmediately` 제거 → synchronizer PTS 동기화 방식으로 전환
+  - 원인: DisplayImmediately가 6프레임을 한번에 표시 → 끊김
+  - 해결: 첫 프레임 PTS에 synchronizer 동기화, flush 후 자동 재동기화
+- [x] flush 후 `resetEnqueueCounter()`로 synchronizer 재동기화 보장
+- **3D 결과**: 자연스러운 영상 흐름 달성! 실기기에서 3D stereo 동작 확인
+- **현재 해상도**: 1280×360 전송 → per eye 640×360 (wifi5GHz 프리셋, downsample 1.5x)
+- **비트레이트**: target 5Mbps, max 6Mbps (HEVC 인코딩)
 
 Phase 2 — 중간 리스크:
 - [ ] 내시경 stereo를 ImmersiveSurgeryView 안에서 렌더링
