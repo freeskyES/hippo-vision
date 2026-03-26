@@ -29,6 +29,10 @@ public final class StereoVideoPlayerHelper {
     /// Track last used resolution to detect when session needs recreation
     private var lastUsedResolution: CGSize? = nil
 
+    /// Cached pixel buffer pool for buffer reuse (avoids CVPixelBufferCreate every frame)
+    private var cachedBufferPool: CVPixelBufferPool?
+    private var cachedPoolResolution: CGSize? = nil
+
     /// Serial queue for thread-safe access to cached resources
     private let processingQueue = DispatchQueue(
         label: "com.television.hippo.stereo-helper",
@@ -68,6 +72,8 @@ public final class StereoVideoPlayerHelper {
                 self.lastUsedResolution = nil
                 self.logger.info("VTPixelTransferSession cache invalidated")
             }
+            self.cachedBufferPool = nil
+            self.cachedPoolResolution = nil
             // Reset frame counters
             self.monoFrameCount = 0
             self.stereoFrameCount = 0
@@ -388,8 +394,58 @@ public final class StereoVideoPlayerHelper {
 
     // MARK: - Buffer Creation
 
-    /// Create NV12 pixel buffer
+    /// Get or create CVPixelBufferPool (cached, recreated on resolution change)
+    private func unsafeGetBufferPool(width: Int, height: Int, format: OSType) -> CVPixelBufferPool? {
+        let resolution = CGSize(width: width, height: height)
+
+        if let pool = cachedBufferPool, cachedPoolResolution == resolution {
+            return pool
+        }
+
+        // Create new pool
+        let poolAttrs: [CFString: Any] = [
+            kCVPixelBufferPoolMinimumBufferCountKey: 4  // 2 eyes × 2 buffered
+        ]
+        let bufferAttrs: [CFString: Any] = [
+            kCVPixelBufferPixelFormatTypeKey: format,
+            kCVPixelBufferWidthKey: width,
+            kCVPixelBufferHeightKey: height,
+            kCVPixelBufferMetalCompatibilityKey: true,
+            kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary
+        ]
+
+        var pool: CVPixelBufferPool?
+        let status = CVPixelBufferPoolCreate(
+            kCFAllocatorDefault,
+            poolAttrs as CFDictionary,
+            bufferAttrs as CFDictionary,
+            &pool
+        )
+
+        guard status == kCVReturnSuccess, let newPool = pool else {
+            logger.error("Failed to create CVPixelBufferPool: \(status)")
+            return nil
+        }
+
+        cachedBufferPool = newPool
+        cachedPoolResolution = resolution
+        logger.info("✅ CVPixelBufferPool created: \(width)×\(height)")
+        return newPool
+    }
+
+    /// Create NV12 pixel buffer (uses pool if available)
     private func createNV12Buffer(width: Int, height: Int, format: OSType) -> CVPixelBuffer? {
+        // Try pool first
+        if let pool = unsafeGetBufferPool(width: width, height: height, format: format) {
+            var buffer: CVPixelBuffer?
+            let status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer)
+            if status == kCVReturnSuccess, let result = buffer {
+                return result
+            }
+            logger.warning("Pool allocation failed (\(status)), falling back to direct create")
+        }
+
+        // Fallback: direct allocation
         let attrs: [CFString: Any] = [
             kCVPixelBufferPixelFormatTypeKey: format,
             kCVPixelBufferWidthKey: width,
