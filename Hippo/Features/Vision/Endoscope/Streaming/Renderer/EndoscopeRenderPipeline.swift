@@ -647,9 +647,9 @@ public final class EndoscopeRenderPipeline: ObservableObject {
                 guard let self = self else { return }
                 self.framesSkipped += 1
 
-                // Aggressive recovery: flush every 6 skipped frames (~200ms at 30fps)
-                // Stereo renderer on real device only consumes ~6 frames before stalling
-                if self.framesSkipped >= 6 {
+                // Aggressive recovery: flush after 2 skipped frames (~66ms at 30fps)
+                // Minimizes stutter gap between flush cycles
+                if self.framesSkipped >= 2 {
                     player.videoRenderer.flush()
                     self.framesSkipped = 0
                 }
