@@ -217,12 +217,45 @@ Phase 3 — 높은 리스크, 최대 성능:
 
 ---
 
+## 해상도 파이프라인 비교 (Vision Pro vs Galaxy XR)
+
+### 해상도 축소 과정
+
+| 단계 | 해상도 (전체) | per eye | 원본 대비 |
+|------|-------------|---------|----------|
+| Mac 카메라 원본 | 1920×1080 ×2 | 1920×1080 | 100% |
+| Half SBS 합성 | 1920×540 | 960×540 | 25% |
+| downsample 1.5x 인코딩 | 1280×360 | 640×360 | **11%** |
+
+### Vision Pro vs Galaxy XR 3D 처리 비교
+
+| | **Vision Pro** | **Galaxy XR** |
+|---|---|---|
+| **코덱** | HEVC (H.265) | H.264 |
+| **3D 방식** | CMTaggedBuffer (L/R 분리 후 태깅) | SBS → SpatialExternalSurface (HW 자동 분리) |
+| **stereo 분리 주체** | Vision Pro CPU (VTPixelTransfer ×2) | Galaxy XR 하드웨어 (StereoMode.SideBySide) |
+| **추가 처리** | VTPixelTransfer + CMTaggedBuffer 생성 | 없음 (SBS 그대로 Surface에 전달) |
+| **표시 해상도** | 640×360 per eye | 640×360 per eye |
+| **전송 비트레이트** | 5Mbps (HEVC) | 5Mbps (H.264) |
+
+### 해상도 개선 옵션
+
+| 설정 변경 | per eye | 원본 대비 | 리스크 |
+|----------|---------|----------|--------|
+| downsample 1.0x (제거) | 960×540 | 25% | 인코더 부하↑, VT-CS 에러 가능 |
+| Full SBS + downsample 1.5x | 1280×720 | 44% | 비트레이트 2배↑ |
+| Full SBS + downsample 1.0x | 1920×1080 | 100% | 매우 높은 대역폭, 인코더 한계 |
+
+---
+
 ## 브랜치 구조
 
 ```
 develop
-├── fix/galaxy-xr-webrtc     ← Galaxy XR용 (H.264, client-sdk 2.12.1)
-└── fix/vision-pro-webrtc    ← Vision Pro용 (HEVC, client-sdk 2.10.1)
+├── fix/galaxy-xr-webrtc              ← Galaxy XR용 (H.264, client-sdk 2.12.1)
+├── fix/vision-pro-webrtc             ← Vision Pro용 (HEVC, client-sdk 2.10.1)
+├── optimize/stereo-3d-latency        ← Phase 1 + 1.5 최적화 완료
+└── experiment/stereo-immersive-space  ← 실험 (merged)
 ```
 
 ---
