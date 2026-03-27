@@ -134,6 +134,35 @@ Galaxy XR의 MediaCodec HW 디코더는 프레임당 <1ms. Vision Pro의 LiveKit
 
 4. **해상도 올리기** — 위 최적화 완료 후, 여유분으로 downsample 1.0x (per eye 960x540) 시도.
 
+### HW 디코더 조사 결과 (2026-03-27)
+
+현재 `HEVCVideoDecoder.swift`는 **VTDecompressionSession을 사용**하고 있다. 이건 VideoToolbox API로, Apple 하드웨어 디코더를 쓸 수 있는 API다. 하지만 **HW 가속을 명시적으로 요청하지 않고 있었다**:
+
+```swift
+// 현재 코드
+VTDecompressionSessionCreate(
+    decoderSpecification: nil,  // ← nil = 시스템이 HW/SW 알아서 결정
+    ...
+)
+```
+
+`nil`이면 VideoToolbox가 "최적"이라 판단하는 쪽을 선택한다. Vision Pro(M2 칩)에 HEVC HW 디코더가 있지만, 특정 조건에서 SW 폴백할 수 있다.
+
+**즉시 적용 가능한 최적화:**
+
+1. **HW 가속 힌트 추가** — `kVTVideoDecoderSpecification_EnableHardwareAcceleratedVideoDecoder: true` 설정. VideoToolbox에 "가능하면 HW 써라"고 명시. 예상 CPU 5% 감소.
+
+2. **GPU 호환 픽셀 버퍼 속성** — `kCVPixelBufferOpenGLESCompatibilityKey`, `IOSurfaceOpenGLESFBOCompatibility` 추가. GPU 전달 효율 개선. 예상 CPU 8% 감소.
+
+3. **디코더 backpressure 프레임 드롭** — VTDecompressionSession에 제출하는 프레임 수를 최대 2개로 제한. 파이프라인이 밀릴 때 프레임 누적 방지. 예상 CPU 15% 감소.
+
+**Galaxy XR 수준(zero-copy) 달성은 구조상 불가:**
+- Android: MediaCodec → Surface (1단계, GPU 내부)
+- visionOS: VTDecompressionSession → CVPixelBuffer → 처리 → AVSampleBufferVideoRenderer (3단계, CPU 경유)
+- visionOS에는 VideoToolbox → RealityKit 직접 Surface 연결 API가 없다
+
+**결론:** HW 디코더 자체는 이미 사용 가능하지만 최적화 여지가 있다. 위 3가지 적용으로 현재 대비 ~20% CPU 사용 감소 예상. Galaxy XR처럼 0-copy는 불가하지만, 레이턴시 여유를 만들어서 해상도 올릴 공간을 확보할 수 있다.
+
 ---
 
 ## 2026-03-26: 3D Stereo, 드디어 자연스럽게 흘러나오다
