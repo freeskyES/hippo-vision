@@ -2,6 +2,67 @@
 
 ---
 
+## 2026-03-27: 인코더 동적 전환 구현
+
+### 단일 브랜치 통합을 위한 첫 단계
+
+Galaxy XR(H.264)과 Vision Pro(HEVC) 브랜치를 별도로 관리하는 건 피처 추가할 때마다 양쪽에 구현해야 해서 불편했다. receiver가 등록할 때 디바이스 타입을 전달하고, Mac이 그에 맞는 인코더를 자동 선택하도록 구현했다.
+
+### 변경 사항
+
+흐름:
+```
+Vision Pro 연결:
+  VP → register(role: "receiver", device: "visionPro")
+  Server → sender: ready(device: "visionPro")
+  Mac → HEVC 인코더 선택
+
+Galaxy XR 연결:
+  XR → register(role: "receiver")  ← device 없음 → "unknown"
+  Server → sender: ready(device: "unknown")
+  Mac → H.264 인코더 선택
+```
+
+수정 파일:
+- `SignalingClient`: `connect(as:device:)` 파라미터 추가
+- `WebRTCReceiver`: `device: "visionPro"` 전달
+- `EmbeddedSignalingServer`: receiver device를 sender에게 전달
+- `SignalingConnection`: `deviceType` 프로퍼티 추가
+- `SignalingDelegate`: `didReceiveReceiverReady(device:)` 시그니처 변경
+- `WebRTCManager`: `receiverDevice`에 따라 HEVC/H.264 동적 선택
+- `StreamingControlViewModel`: `connectedDeviceType` 저장 후 transport에 전달
+
+### 실기기 테스트 결과
+
+- Vision Pro 실기기에서 HEVC 인코더 정상 선택 확인
+- 영상 동작 확인 (시뮬레이터 대비 살짝 끊김은 네트워크/ICE 특성)
+- Galaxy XR은 기기 미보유로 미테스트 — `unknown` → H.264 선택 로직은 구현 완료
+
+### 라이브러리 버전
+
+현재 `exact 2.10.1` (webrtc-xcframework 137.7151.10)로 고정. Galaxy XR은 Android 별도 프로젝트라 이 버전과 무관.
+
+---
+
+## 작업 리스트
+
+### 우선순위 높음
+- [ ] Galaxy XR 실기기 테스트 (동적 전환 H.264 동작 확인)
+- [ ] Galaxy XR signaling에 `device: "galaxyXR"` 명시 추가 (현재 unknown으로도 동작)
+- [ ] 단일 브랜치 통합: `feat/dynamic-encoder-switching` → `fix/vision-pro-webrtc` → develop merge
+
+### 우선순위 중간
+- [ ] 3D stereo 추가 최적화 (Phase 2: ImmersiveSpace / Phase 3: Metal)
+- [ ] 해상도 개선 테스트 (downsample 1.0x → per eye 960x540)
+- [ ] ICE 연결 속도 개선 (실기기에서 수십초 소요)
+
+### 우선순위 낮음
+- [ ] Full SBS 모드 안정화
+- [ ] GCC 비트레이트 ramp-up 최적화 (연결 후 1-2Mbps에서 느리게 상승)
+- [ ] Instruments 프로파일링 (각 단계별 실제 소요 시간 측정)
+
+---
+
 ## 2026-03-26: 3D Stereo, 드디어 자연스럽게 흘러나오다
 
 어제(3/25) WebRTC 연결을 복구하고 3D를 겨우 표시하는 데 성공했지만, 영상이 뚝뚝 끊기고 레이턴시가 심했다. 오늘은 그 문제를 파고들어 실질적인 개선을 이뤄냈다.
