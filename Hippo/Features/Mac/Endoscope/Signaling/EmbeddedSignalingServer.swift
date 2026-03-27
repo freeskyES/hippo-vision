@@ -272,12 +272,17 @@ public final class EmbeddedSignalingServer: ObservableObject {
             }
             receiverClient = client
             hasReceiver = true
-            logger.info("🥽 RECEIVER registered")
+
+            // Capture device type from receiver
+            let device = json["device"] as? String ?? "unknown"
+            client.deviceType = device
+            logger.info("🥽 RECEIVER registered (device: \(device))")
 
             sendJSON(["type": "registered", "role": "receiver"], to: client)
 
             if let sender = senderClient {
-                sendJSON(["type": "ready", "message": "Receiver connected"], to: sender)
+                // Forward device type to sender so it can select the right encoder
+                sendJSON(["type": "ready", "message": "Receiver connected", "device": device], to: sender)
             }
         }
     }

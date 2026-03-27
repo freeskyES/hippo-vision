@@ -86,6 +86,9 @@ public final class WebRTCManager: NSObject, IVideoTransport {
 
     // MARK: Initialization
 
+    /// Connected receiver device type for encoder selection
+    public var receiverDevice: String = "unknown"
+
     public init(config: TransportConfig = .standard) {
         self.config = config
         self.rtcQueue = DispatchQueue(
@@ -128,15 +131,22 @@ public final class WebRTCManager: NSObject, IVideoTransport {
             print("[WebRTCManager] WebRTC already initialized, skipping SSL/tracer setup")
         }
 
-        // Use HEVC encoder for Vision Pro (better compression)
-        let encoderFactory = HEVCVideoEncoderFactory()
+        // Dynamic encoder selection based on receiver device type
+        let encoderFactory: LKRTCVideoEncoderFactory
+        if receiverDevice == "visionPro" {
+            encoderFactory = HEVCVideoEncoderFactory()
+            print("[WebRTCManager] Encoder: HEVC (Vision Pro)")
+        } else {
+            encoderFactory = LKRTCDefaultVideoEncoderFactory()
+            print("[WebRTCManager] Encoder: H.264 (Galaxy XR / default)")
+        }
         let decoderFactory = LKRTCDefaultVideoDecoderFactory()
 
         peerConnectionFactory = LKRTCPeerConnectionFactory(
             encoderFactory: encoderFactory,
             decoderFactory: decoderFactory
         )
-        print("[WebRTCManager] Peer connection factory created with HEVC support")
+        print("[WebRTCManager] Peer connection factory created (device: \(receiverDevice))")
 
         // 2. Create peer connection
         print("[WebRTCManager] Creating peer connection...")

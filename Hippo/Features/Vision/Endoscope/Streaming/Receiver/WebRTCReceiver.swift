@@ -365,8 +365,8 @@ public final class WebRTCReceiver: NSObject, ObservableObject {
         signalingClient = SignalingClient(serverURL: self.signalingServerURL)
         signalingClient?.delegate = self
 
-        logger.info("Connecting to signaling server as 'receiver'...")
-        try signalingClient?.connect(as: "receiver")
+        logger.info("Connecting to signaling server as 'receiver' (device: visionPro)...")
+        try signalingClient?.connect(as: "receiver", device: "visionPro")
         logger.info("SignalingClient connection initiated")
     }
 

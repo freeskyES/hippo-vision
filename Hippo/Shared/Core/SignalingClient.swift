@@ -70,13 +70,13 @@ public protocol SignalingDelegate: AnyObject {
     func signalingClient(_ client: SignalingClient, didReceiveAnswer sdp: String)
     func signalingClient(_ client: SignalingClient, didReceiveCandidate candidate: String, sdpMid: String?, sdpMLineIndex: Int32)
     func signalingClientDidReceiveRenegotiate(_ client: SignalingClient)
-    func signalingClientDidReceiveReceiverReady(_ client: SignalingClient)
+    func signalingClientDidReceiveReceiverReady(_ client: SignalingClient, device: String?)
     func signalingClient(_ client: SignalingClient, didChangeState state: SignalingState)
 }
 
 public extension SignalingDelegate {
     func signalingClientDidReceiveRenegotiate(_ client: SignalingClient) {}
-    func signalingClientDidReceiveReceiverReady(_ client: SignalingClient) {}
+    func signalingClientDidReceiveReceiverReady(_ client: SignalingClient, device: String?) {}
 }
 
 // MARK: - Signaling State
@@ -117,6 +117,7 @@ public final class SignalingClient {
     private var currentAttempt: Int = 0
     private var reconnectionTimer: Timer?
     private var currentRole: String = ""
+    private var currentDevice: String?
 
     /// P0.3: Reconnection state
     private(set) var reconnectionState: ReconnectionState = .idle
@@ -145,13 +146,14 @@ public final class SignalingClient {
 
     // MARK: - Public Methods
 
-    public func connect(as role: String) throws {
+    public func connect(as role: String, device: String? = nil) throws {
         guard state == .disconnected else {
             logger.warning("⚠️ Already connected or connecting")
             return
         }
 
         currentRole = role
+        currentDevice = device
 
         logger.info("🔌 Connecting to \(self.serverURL.absoluteString) as \(role)")
 
@@ -177,11 +179,14 @@ public final class SignalingClient {
 
             self.logger.info("✅ WebSocket connection established")
 
-            // Now register client role
-            let registerMessage: [String: String] = [
+            // Now register client role with optional device type
+            var registerMessage: [String: String] = [
                 "type": "register",
                 "role": role
             ]
+            if let device = self.currentDevice {
+                registerMessage["device"] = device
+            }
 
             if let data = try? JSONSerialization.data(withJSONObject: registerMessage),
                let jsonString = String(data: data, encoding: .utf8) {
@@ -309,7 +314,8 @@ public final class SignalingClient {
                 delegate?.signalingClientDidReceiveRenegotiate(self)
             case "receiver-ready", "ready":
                 // Handle both "receiver-ready" and "ready" for compatibility
-                delegate?.signalingClientDidReceiveReceiverReady(self)
+                let device = json["device"] as? String
+                delegate?.signalingClientDidReceiveReceiverReady(self, device: device)
             default:
                 logger.warning("⚠️ Unknown message type: \(type)")
             }

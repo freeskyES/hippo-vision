@@ -18,6 +18,7 @@ final class SignalingConnection: @unchecked Sendable {
     let id: UUID
     let connection: NWConnection
     var role: String?
+    var deviceType: String?
     var isAlive: Bool = true
 
     // ICE candidate statistics

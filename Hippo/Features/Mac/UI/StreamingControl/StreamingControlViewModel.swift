@@ -173,6 +173,8 @@ public final class StreamingControlViewModel {
     var isSignalingConnected: Bool = false
     /// Receiver(Vision Pro) 준비 상태
     var isReceiverReady: Bool = false
+    /// 연결된 receiver 디바이스 타입 ("visionPro", "galaxyXR", "unknown")
+    var connectedDeviceType: String = "unknown"
 
     // MARK: - State: Inspector Settings
 
@@ -422,6 +424,7 @@ public final class StreamingControlViewModel {
         let sync = FrameSync()
         let comp = CI_SBSComposer()
         let webrtc = WebRTCManager(config: .wifi5GHz)
+        webrtc.receiverDevice = connectedDeviceType
 
         self.frameSync = sync
         self.composer = comp
@@ -478,6 +481,7 @@ public final class StreamingControlViewModel {
 
         // Initialize WebRTC transport
         let webrtc = WebRTCManager(config: .wifi5GHz)
+        webrtc.receiverDevice = connectedDeviceType
         self.transport = webrtc
 
         // Mono video 시작 - settings를 전달하지 않아 카메라의 네이티브 해상도 사용
@@ -721,9 +725,11 @@ extension StreamingControlViewModel: SignalingDelegate {
         }
     }
 
-    nonisolated public func signalingClientDidReceiveReceiverReady(_ client: SignalingClient) {
+    nonisolated public func signalingClientDidReceiveReceiverReady(_ client: SignalingClient, device: String?) {
         Task { @MainActor in
-            self.logger.info("🎉 Receiver (Vision Pro) is ready!")
+            let deviceName = device ?? "unknown"
+            self.connectedDeviceType = deviceName
+            self.logger.info("🎉 Receiver ready! (device: \(deviceName))")
             self.isReceiverReady = true
 
             if self.isStreaming {
