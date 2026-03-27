@@ -66,6 +66,73 @@ Galaxy XR 연결:
 - 당시 H.264 인코더 기준. HEVC 인코더에서는 결과가 다를 수 있음
 - downsample 2.0x (960x270)는 안정적이나 화질 낮음
 - 현재 downsample 1.5x (1280x360)가 안정성/화질 절충안
+- **해상도 올리기 전에 레이턴시 최적화가 먼저** — 해상도↑ = 인코딩/전송/디코딩 부하↑ = 레이턴시 악화
+
+---
+
+## 2026-03-27: 왜 Vision Pro는 Galaxy XR보다 느릴까?
+
+### 의문의 시작
+
+실기기 테스트에서 Vision Pro의 레이턴시가 0.1~0.4초 정도 있다. 2D는 네트워크 환경에 따라 딜레이될 때가 있고, 3D는 거기서 0.3초 더 딜레이되는 느낌.
+
+그런데 이상한 점: **핫스팟(Mac↔Vision Pro 직접 연결)과 로컬 네트워크(라우터 경유)에서 체감 차이가 거의 없다.** 오히려 로컬이 더 느린 느낌까지.
+
+Galaxy XR에서는 같은 Mac, 같은 네트워크에서 훨씬 안정적이고 빠른데, Vision Pro만 불안정하다. 왜?
+
+### 핵심 추론: 네트워크가 병목이 아니다
+
+핫스팟은 Mac과 Vision Pro가 직접 연결되므로 네트워크 홉이 최소다. 그런데도 개선이 안 된다는 건:
+
+> **네트워크 전송(B) 단계가 병목이 아니라, Vision Pro 내부 처리(C/D/E)가 병목이라는 뜻이다.**
+
+```
+Mac 인코딩(A) → 네트워크(B) → VP 디코딩(C) → stereo 처리(D) → 렌더링(E)
+```
+
+네트워크를 아무리 빠르게 해도 C+D+E가 줄지 않으니 체감 차이가 없는 것.
+
+### 근거: Galaxy XR과 파이프라인 비교
+
+같은 네트워크, 같은 Mac, 같은 해상도(1280x360)인데 Galaxy XR이 더 부드러운 이유:
+
+단계 | Galaxy XR | Vision Pro
+--- | --- | ---
+디코딩(C) | MediaCodec HW 디코더 (<1ms) | LiveKitWebRTC SW 디코더 (5~15ms 추정)
+처리(D) | 없음. SBS 그대로 Surface에 전달 | VTPixelTransfer x2 + CMTaggedBuffer 생성
+렌더링(E) | Surface zero-copy → 즉시 표시 | AVSampleBufferVideoRenderer + flush 사이클
+
+Galaxy XR은 디코딩된 프레임이 HW에서 Surface로 zero-copy 전달. CPU가 프레임을 한번도 만지지 않는다.
+
+Vision Pro는 SW 디코딩 후 CPU에서 SBS 분리(2회), 태깅, 버퍼 생성, enqueue까지 최소 5번 CPU 작업이 필요하다.
+
+### 가장 큰 용의자: SW HEVC 디코딩
+
+Galaxy XR의 MediaCodec HW 디코더는 프레임당 <1ms. Vision Pro의 LiveKitWebRTC는 소프트웨어 HEVC 디코더를 사용하며, 프레임당 5~15ms 소요 추정.
+
+30fps에서 프레임 간격은 33ms. SW 디코딩에 15ms를 쓰면 남는 시간이 18ms뿐이고, 여기에 stereo 처리까지 하면 파이프라인 전체가 빠듯해진다. 프레임이 밀리기 시작하면 지연이 누적된다.
+
+단, Vision Pro에도 VideoToolbox HW HEVC 디코더가 있다. 현재 LiveKitWebRTC 라이브러리가 이걸 쓰고 있는지, 아니면 SW 폴백을 쓰고 있는지는 프로파일링 없이 확정 불가.
+
+### 해상도 올리기 전에 최적화가 먼저인 이유
+
+현재도 레이턴시 여유가 없는 상태에서 해상도를 올리면:
+- 인코딩 시간↑ (Mac)
+- 전송 데이터↑ (네트워크)
+- 디코딩 시간↑ (Vision Pro)
+- VTPixelTransfer 처리 시간↑ (더 큰 버퍼)
+
+전 구간이 느려진다. **먼저 파이프라인을 최적화해서 여유를 만들고, 그 여유분으로 해상도를 올리는 게 맞는 순서.**
+
+### 최적화 방향 (우선순위순)
+
+1. **HW 디코더 확인** — Vision Pro에서 VideoToolbox HW HEVC 디코딩이 가능한지 조사. 가능하다면 LiveKitWebRTC의 SW 디코더를 우회하고 HW 디코더를 직접 사용. Galaxy XR 수준의 디코딩 속도 기대.
+
+2. **Instruments 프로파일링** — 각 단계(디코딩/처리/렌더링)의 실제 소요 시간을 측정해서 정확한 병목 특정. 추측이 아닌 데이터 기반 최적화.
+
+3. **3D stereo Phase 2** — ImmersiveSpace에서 렌더링하면 flush 사이클 제거 가능. 3D 전용 레이턴시 개선.
+
+4. **해상도 올리기** — 위 최적화 완료 후, 여유분으로 downsample 1.0x (per eye 960x540) 시도.
 
 ---
 
