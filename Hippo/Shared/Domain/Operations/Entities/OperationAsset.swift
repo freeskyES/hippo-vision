@@ -43,22 +43,23 @@ public struct OperationAsset: Identifiable, Codable, Equatable, Sendable {
 }
 
 public extension OperationAsset {
-    /// 저장된 파일 데이터를 임시 파일로 저장하고 URL을 반환합니다.
+    /// 저장된 파일 데이터를 캐시 파일로 저장하고 URL을 반환합니다.
+    /// Caches 디렉토리 사용 (temp보다 오래 유지, 이미 존재하면 재작성 안 함)
     func getResolvedURL() -> URL? {
-        // 임시 디렉토리에 파일 저장
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent(originalFileName)
-        
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let modelDir = cacheDir.appendingPathComponent("3DModels", isDirectory: true)
+        let fileURL = modelDir.appendingPathComponent("\(id)_\(originalFileName)")
+
+        // 이미 존재하면 재사용 (디스크 write 생략)
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            return fileURL
+        }
+
         do {
-            // 기존 파일이 있으면 삭제
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                try FileManager.default.removeItem(at: fileURL)
-            }
-            
-            // 파일 데이터를 임시 파일로 저장
+            try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
             try fileData.write(to: fileURL)
             return fileURL
-            
         } catch {
             print("Failed to write file data for \(originalFileName): \(error)")
             return nil
