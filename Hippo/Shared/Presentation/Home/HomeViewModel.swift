@@ -82,22 +82,30 @@ public final class HomeViewModel {
         _state.alert = nil
 
         do {
-            // Load patients first
+            // Single DB query — extract today's operations from same data
             let patients = try await listPatients.run()
             logger.debug("Loaded \(patients.count) patients from repository")
 
             let displayModels = patients.map { $0.toDisplayModel() }
 
-            // Load today's operations (reuses cached patient data internally)
-            let operationsWithPatient = try await getTodayOperations.run()
-            let todayOps = operationsWithPatient.map { owp in
-                (patient: owp.patient.toDisplayModel(), operation: owp.operation.toDisplayModel())
+            // Filter today's operations from already-loaded patients (no extra DB call)
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: Date())
+            var todayOps: [(patient: PatientDisplayModel, operation: OperationDisplayModel)] = []
+            for patient in patients {
+                for op in patient.operations where calendar.startOfDay(for: op.date) == today {
+                    todayOps.append((patient: patient.toDisplayModel(), operation: op.toDisplayModel()))
+                }
+            }
+            // Sort: non-completed first, then by time
+            todayOps.sort { lhs, rhs in
+                lhs.operation.date < rhs.operation.date
             }
 
             // Update UI at once
             _state.items = displayModels
             todayOperations = todayOps
-            logger.info("State updated with \(_state.items.count) items")
+            logger.info("Loaded all data")
         } catch {
             logger.error("Failed to load data: \(error.localizedDescription)")
             _state.alert = "Failed to load data: \(error.localizedDescription)"
