@@ -298,10 +298,10 @@ private func seedDemoDataIfEmpty(context: ModelContext) {
   let modelDataKJD: Data = {
     guard let url = Bundle.main.url(forResource: "KJD_HCC", withExtension: "usdz"),
           let data = try? Data(contentsOf: url) else {
-      print("⚠️ KJD_HCC.usdz not found in bundle, skipping 3D model")
+      print("KJD_HCC.usdz not found in bundle, skipping 3D model")
       return Data()
     }
-    print("🌱 Loaded KJD_HCC.usdz (\(data.count / 1024)KB)")
+    print("Loaded KJD_HCC.usdz (\(data.count / 1024)KB)")
     return data
   }()
 

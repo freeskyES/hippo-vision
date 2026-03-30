@@ -105,7 +105,7 @@ public final class HomeViewModel {
             // Update UI at once
             _state.items = displayModels
             todayOperations = todayOps
-            logger.info("Loaded all data")
+            logger.info("Loaded all data ")
         } catch {
             logger.error("Failed to load data: \(error.localizedDescription)")
             _state.alert = "Failed to load data: \(error.localizedDescription)"

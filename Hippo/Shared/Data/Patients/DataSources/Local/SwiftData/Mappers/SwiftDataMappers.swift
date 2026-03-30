@@ -111,10 +111,10 @@ extension Operation {
 extension OperationAsset {
     /// Convert SwiftData SDOperationAsset to Domain OperationAsset
     @MainActor
-    static func fromSwiftData(_ s: SDOperationAsset, includeFileData: Bool = false) -> OperationAsset {
+    static func fromSwiftData(_ s: SDOperationAsset) -> OperationAsset {
         OperationAsset(
             id: s.id,
-            fileData: includeFileData ? s.fileData : Data(),
+            fileData: s.fileData,
             originalFileName: s.originalFileName,
             createdAt: s.createdAt
         )
