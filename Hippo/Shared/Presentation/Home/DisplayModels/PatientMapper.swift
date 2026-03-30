@@ -54,7 +54,7 @@ public extension OperationAsset {
             id: id,
             fileName: originalFileName,
             createdAt: createdAt,
-            fileURL: getResolvedURL() ?? URL(fileURLWithPath: ""),
+            fileURL: getResolvedURL() ?? URL(fileURLWithPath: "")
         )
     }
 }

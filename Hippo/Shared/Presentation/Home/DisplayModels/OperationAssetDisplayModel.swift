@@ -9,7 +9,6 @@ public struct OperationAssetDisplayModel: Identifiable, Equatable, Sendable {
     public let fileURL: URL
     public let createdAt: Date
 
-    /// 도메인 모델(OperationAsset)로부터 DisplayModel을 생성하는 매퍼(Mapper)
     public init(id: String, fileName: String, createdAt: Date, fileURL: URL) {
         self.id = id
         self.fileName = fileName
@@ -20,7 +19,6 @@ public struct OperationAssetDisplayModel: Identifiable, Equatable, Sendable {
 
 public extension OperationAssetDisplayModel {
     func toDomain() -> OperationAsset {
-        // fileURL에서 실제 파일 데이터를 읽어서 저장
         let fileData: Data
         do {
             fileData = try Data(contentsOf: fileURL)

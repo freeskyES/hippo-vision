@@ -17,7 +17,7 @@ struct AssetListView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     
     @State private var selectedURL: URL?
-    
+
     private var fileURLs: [URL] {
         dataViewModel.state.operation?.assets.map { $0.fileURL } ?? []
     }
