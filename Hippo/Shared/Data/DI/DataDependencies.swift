@@ -277,14 +277,24 @@ private func seedDemoDataIfEmpty(context: ModelContext) {
   let sharedSurgicalSite = "간 S5(5분절), 중앙부"
   let sharedDetails = "동맥기 조영증강 및 지연기 소실(washout) 소견을 보이는 간 S5 종양으로, 중간간정맥(MHV) 인접하나 혈관 침범은 없음. 약 5 mm 안전거리를 확보한 부분 간절제 예정."
 
-  // 3D 모델 에셋 (KBA_HCC.usdz) 로드
-  let modelData: Data = {
+  // 3D 모델 에셋 로드
+  let modelDataKBA: Data = {
     guard let url = Bundle.main.url(forResource: "KBA_HCC", withExtension: "usdz"),
           let data = try? Data(contentsOf: url) else {
       print("⚠️ KBA_HCC.usdz not found in bundle, skipping 3D model")
       return Data()
     }
     print("🌱 Loaded KBA_HCC.usdz (\(data.count / 1024)KB)")
+    return data
+  }()
+
+  let modelDataKJD: Data = {
+    guard let url = Bundle.main.url(forResource: "KJD_HCC", withExtension: "usdz"),
+          let data = try? Data(contentsOf: url) else {
+      print("⚠️ KJD_HCC.usdz not found in bundle, skipping 3D model")
+      return Data()
+    }
+    print("🌱 Loaded KJD_HCC.usdz (\(data.count / 1024)KB)")
     return data
   }()
 
@@ -309,8 +319,8 @@ private func seedDemoDataIfEmpty(context: ModelContext) {
     statusRaw: OperationStatus.planned.rawValue
   )
   op1.patient = patient1
-  if !modelData.isEmpty {
-    let asset1 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelData)
+  if !modelDataKBA.isEmpty {
+    let asset1 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelDataKBA)
     asset1.operation = op1
     op1.assets = [asset1]
   }
@@ -337,8 +347,8 @@ private func seedDemoDataIfEmpty(context: ModelContext) {
     statusRaw: OperationStatus.planned.rawValue
   )
   op2.patient = patient2
-  if !modelData.isEmpty {
-    let asset2 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelData)
+  if !modelDataKBA.isEmpty {
+    let asset2 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelDataKBA)
     asset2.operation = op2
     op2.assets = [asset2]
   }
@@ -365,8 +375,8 @@ private func seedDemoDataIfEmpty(context: ModelContext) {
     statusRaw: OperationStatus.planned.rawValue
   )
   op3.patient = patient3
-  if !modelData.isEmpty {
-    let asset3 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelData)
+  if !modelDataKBA.isEmpty {
+    let asset3 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelDataKBA)
     asset3.operation = op3
     op3.assets = [asset3]
   }
@@ -393,18 +403,47 @@ private func seedDemoDataIfEmpty(context: ModelContext) {
     statusRaw: OperationStatus.planned.rawValue
   )
   op4.patient = patient4
-  if !modelData.isEmpty {
-    let asset4 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelData)
+  if !modelDataKBA.isEmpty {
+    let asset4 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KBA_HCC.usdz", fileData: modelDataKBA)
     asset4.operation = op4
     op4.assets = [asset4]
   }
   patient4.operations = [op4]
 
-  for patient in [patient1, patient2, patient3, patient4] {
+  // 환자 5: 김종득 — patientNumber: 1780
+  let patient5 = SDPatient(
+    id: UUID().uuidString,
+    patientNumber: "1780",
+    name: "김종득",
+    genderRaw: Gender.male.rawValue,
+    birthDate: calendar.date(from: DateComponents(year: 1965, month: 1, day: 1))!,
+    createdAt: now,
+    updatedAt: now
+  )
+  let op5Date = calendar.date(from: DateComponents(year: 2026, month: 3, day: 31))!
+  let op5 = SDOperation(
+    id: UUID().uuidString,
+    title: "간 종양 절제",
+    diagnosis: sharedDiagnosis,
+    surgeon: "오남기",
+    surgicalSite: sharedSurgicalSite,
+    date: op5Date,
+    details: sharedDetails,
+    statusRaw: OperationStatus.planned.rawValue
+  )
+  op5.patient = patient5
+  if !modelDataKJD.isEmpty {
+    let asset5 = SDOperationAsset(id: UUID().uuidString, originalFileName: "KJD_HCC.usdz", fileData: modelDataKJD)
+    asset5.operation = op5
+    op5.assets = [asset5]
+  }
+  patient5.operations = [op5]
+
+  for patient in [patient1, patient2, patient3, patient4, patient5] {
     context.insert(patient)
   }
 
   try? context.save()
-  print("🌱 Demo data seeded: 4 patients with 간 종양 절제 operations (surgeon: 오남기)")
+  print("🌱 Demo data seeded: 5 patients with 간 종양 절제 operations (surgeon: 오남기)")
 }
 #endif
