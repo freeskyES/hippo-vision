@@ -428,7 +428,7 @@ private func seedDemoDataIfEmpty(context: ModelContext) {
     createdAt: latestUpdate,
     updatedAt: latestUpdate
   )
-  let op5Date = calendar.date(from: DateComponents(year: 2026, month: 3, day: 31))!
+  let op5Date = now  // 오늘 날짜로 설정 (today surgery에 표시)
   let op5 = SDOperation(
     id: UUID().uuidString,
     title: "간 종양 절제",
