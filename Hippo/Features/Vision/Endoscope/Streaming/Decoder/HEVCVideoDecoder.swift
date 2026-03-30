@@ -504,15 +504,21 @@ public class HEVCVideoDecoder: NSObject, LKRTCVideoDecoder {
             decompressionOutputRefCon: Unmanaged.passUnretained(self).toOpaque()
         )
 
+        // Prefer hardware-accelerated decoding (Vision Pro M2 has HEVC HW decoder)
+        let decoderSpec: [CFString: Any] = [
+            kVTVideoDecoderSpecification_EnableHardwareAcceleratedVideoDecoder: true
+        ]
+
         let pixelBufferAttributes: [CFString: Any] = [
             kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,  // NV12 for better performance (was BGRA)
-            kCVPixelBufferMetalCompatibilityKey: true
+            kCVPixelBufferMetalCompatibilityKey: true,
+            kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary  // GPU-optimized transfer
         ]
 
         let status = VTDecompressionSessionCreate(
             allocator: kCFAllocatorDefault,
             formatDescription: formatDesc,
-            decoderSpecification: nil,
+            decoderSpecification: decoderSpec as CFDictionary,
             imageBufferAttributes: pixelBufferAttributes as CFDictionary,
             outputCallback: &outputCallback,
             decompressionSessionOut: &session
