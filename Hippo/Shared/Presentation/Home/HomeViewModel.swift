@@ -82,23 +82,22 @@ public final class HomeViewModel {
         _state.alert = nil
 
         do {
-            // Load patients and today's operations in parallel
-            async let patientsTask = listPatients.run()
-            async let operationsTask = getTodayOperations.run()
-
-            let patients = try await patientsTask
-            let operationsWithPatient = try await operationsTask
-
+            // Load patients first
+            let patients = try await listPatients.run()
             logger.debug("Loaded \(patients.count) patients from repository")
 
-            // Update UI at once (both lists appear together)
             let displayModels = patients.map { $0.toDisplayModel() }
-            _state.items = displayModels
-            todayOperations = operationsWithPatient.map { owp in
+
+            // Load today's operations (reuses cached patient data internally)
+            let operationsWithPatient = try await getTodayOperations.run()
+            let todayOps = operationsWithPatient.map { owp in
                 (patient: owp.patient.toDisplayModel(), operation: owp.operation.toDisplayModel())
             }
 
-            logger.info("State updated with \(self._state.items.count) items")
+            // Update UI at once
+            _state.items = displayModels
+            todayOperations = todayOps
+            logger.info("State updated with \(_state.items.count) items")
         } catch {
             logger.error("Failed to load data: \(error.localizedDescription)")
             _state.alert = "Failed to load data: \(error.localizedDescription)"
