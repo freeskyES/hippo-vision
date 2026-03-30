@@ -98,7 +98,7 @@ public final class HomeViewModel {
                 (patient: owp.patient.toDisplayModel(), operation: owp.operation.toDisplayModel())
             }
 
-            logger.info("State updated with \(_state.items.count) items")
+            logger.info("State updated with \(self._state.items.count) items")
         } catch {
             logger.error("Failed to load data: \(error.localizedDescription)")
             _state.alert = "Failed to load data: \(error.localizedDescription)"
