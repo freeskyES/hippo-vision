@@ -251,13 +251,20 @@ private final class PatientRemoteDataSourceMock: PatientRemoteDataSource {
 #if DEBUG
 @MainActor
 private func seedDemoDataIfEmpty(context: ModelContext) {
-  // 3D 모델이 포함된 데모 데이터가 있는지 확인
+  // 김종득 환자가 있는지 확인 (최신 시딩 기준)
+  let patientCheck = FetchDescriptor<SDPatient>(predicate: #Predicate { $0.name == "김종득" })
+  let hasLatestSeed = ((try? context.fetchCount(patientCheck)) ?? 0) > 0
+
+  if hasLatestSeed {
+    print("Demo data up to date, skipping seed")
+    return
+  }
+
+  // 기존 데이터가 있으면 전체 삭제 후 재시딩 (환자 구성이 변경됐으므로)
   let assetDescriptor = FetchDescriptor<SDOperationAsset>()
   let assetCount = (try? context.fetchCount(assetDescriptor)) ?? 0
-
   if assetCount > 0 {
-    print("🌱 Demo data with 3D models already exists, skipping seed")
-    return
+    print("Updating demo data (new patient added)...")
   }
 
   // 기존 데이터 삭제 (iCloud에서 3D 모델 없이 내려온 데이터 정리)
@@ -410,15 +417,16 @@ private func seedDemoDataIfEmpty(context: ModelContext) {
   }
   patient4.operations = [op4]
 
-  // 환자 5: 김종득 — patientNumber: 1780
+  // 환자 5: 김종득 — patientNumber: 1780 (updatedAt을 최신으로 설정하여 리스트 최상단 표시)
+  let latestUpdate = now.addingTimeInterval(1)
   let patient5 = SDPatient(
     id: UUID().uuidString,
     patientNumber: "1780",
     name: "김종득",
     genderRaw: Gender.male.rawValue,
     birthDate: calendar.date(from: DateComponents(year: 1965, month: 1, day: 1))!,
-    createdAt: now,
-    updatedAt: now
+    createdAt: latestUpdate,
+    updatedAt: latestUpdate
   )
   let op5Date = calendar.date(from: DateComponents(year: 2026, month: 3, day: 31))!
   let op5 = SDOperation(
@@ -439,11 +447,11 @@ private func seedDemoDataIfEmpty(context: ModelContext) {
   }
   patient5.operations = [op5]
 
-  for patient in [patient1, patient2, patient3, patient4, patient5] {
+  for patient in [patient5, patient1, patient2, patient3, patient4] {
     context.insert(patient)
   }
 
   try? context.save()
-  print("🌱 Demo data seeded: 5 patients with 간 종양 절제 operations (surgeon: 오남기)")
+  print("Demo data seeded: 5 patients (surgeon: 오남기)")
 }
 #endif

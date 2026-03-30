@@ -446,6 +446,9 @@
 		C0B03E9D2F716BFC00074927 /* KBA_HCC.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0B03E9C2F716BFC00074927 /* KBA_HCC.usdz */; };
 		C0B03E9E2F716BFC00074927 /* KBA_HCC.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0B03E9C2F716BFC00074927 /* KBA_HCC.usdz */; };
 		C0B03E9F2F716BFC00074927 /* KBA_HCC.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0B03E9C2F716BFC00074927 /* KBA_HCC.usdz */; };
+		C0B13BE72F7A366F00E150B1 /* KJD_HCC.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0B13BE62F7A366F00E150B1 /* KJD_HCC.usdz */; };
+		C0B13BE82F7A366F00E150B1 /* KJD_HCC.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0B13BE62F7A366F00E150B1 /* KJD_HCC.usdz */; };
+		C0B13BE92F7A369E00E150B1 /* KJD_HCC.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C0B13BE62F7A366F00E150B1 /* KJD_HCC.usdz */; };
 		C0F97AA42EA401160063E159 /* PatientMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F97AA22EA401160063E159 /* PatientMapper.swift */; };
 		C0F97AA52EA401160063E159 /* PatientDisplayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F97AA12EA401160063E159 /* PatientDisplayModel.swift */; };
 		C0F97AA62EA401160063E159 /* OperationDisplayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F97AA02EA401160063E159 /* OperationDisplayModel.swift */; };
@@ -778,6 +781,7 @@
 		C050AA4D2EA8201A00352314 /* ImmersiveSceneRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmersiveSceneRuntime.swift; sourceTree = "<group>"; };
 		C05F32242E9FF303009C5974 /* HippoMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HippoMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0B03E9C2F716BFC00074927 /* KBA_HCC.usdz */ = {isa = PBXFileReference; lastKnownFileType = file; path = KBA_HCC.usdz; sourceTree = "<group>"; };
+		C0B13BE62F7A366F00E150B1 /* KJD_HCC.usdz */ = {isa = PBXFileReference; lastKnownFileType = file; path = KJD_HCC.usdz; sourceTree = "<group>"; };
 		C0F97A9E2EA401160063E159 /* DisplayHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayHelpers.swift; sourceTree = "<group>"; };
 		C0F97A9F2EA401160063E159 /* OperationAssetDisplayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationAssetDisplayModel.swift; sourceTree = "<group>"; };
 		C0F97AA02EA401160063E159 /* OperationDisplayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationDisplayModel.swift; sourceTree = "<group>"; };
@@ -1731,6 +1735,7 @@
 				2532080A2ED60438000C2E72 /* demo-2d.mp4 */,
 				253208312ED618B6000C2E72 /* endoscope-demo.mp4 */,
 				C0B03E9C2F716BFC00074927 /* KBA_HCC.usdz */,
+				C0B13BE62F7A366F00E150B1 /* KJD_HCC.usdz */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -2201,6 +2206,7 @@
 			files = (
 				253208082ED60175000C2E72 /* bird-3d.mov in Resources */,
 				C0B03E9E2F716BFC00074927 /* KBA_HCC.usdz in Resources */,
+				C0B13BE82F7A366F00E150B1 /* KJD_HCC.usdz in Resources */,
 				253208332ED618B6000C2E72 /* endoscope-demo.mp4 in Resources */,
 				2532080B2ED60438000C2E72 /* demo-2d.mp4 in Resources */,
 				C02FFA932E9FFF6F00F16742 /* VisionAssets.xcassets in Resources */,
@@ -2216,6 +2222,7 @@
 				C0B03E9F2F716BFC00074927 /* KBA_HCC.usdz in Resources */,
 				2532080C2ED60438000C2E72 /* demo-2d.mp4 in Resources */,
 				14DE51532EB771420027D9A0 /* HIPPO.icon in Resources */,
+				C0B13BE72F7A366F00E150B1 /* KJD_HCC.usdz in Resources */,
 				253208322ED618B6000C2E72 /* endoscope-demo.mp4 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2226,6 +2233,7 @@
 			files = (
 				C02FFA8D2E9FFF6F00F16742 /* MacAssets.xcassets in Resources */,
 				C0B03E9D2F716BFC00074927 /* KBA_HCC.usdz in Resources */,
+				C0B13BE92F7A369E00E150B1 /* KJD_HCC.usdz in Resources */,
 				14DE51522EB771420027D9A0 /* HIPPO.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
