@@ -32,11 +32,41 @@ OTV-S300 DVI-D (SBS 모드)
 - SBS 합성 불필요 (이미 합쳐짐)
 - 레이턴시 감소 (합성 단계 제거)
 
+### OTV-S300 스펙 조사 결과
+
+OTV-S300의 3D SIDE BY SIDE 모드는 좌/우 영상을 **수평 압축(horizontally compressing)**하여 나란히 배치한다. SBS는 무조건 너비가 절반으로 찌부되는 형태.
+
+출력 해상도 옵션:
+- 1080p 모드: 1920x1080 SBS → per eye 960x1080 (너비 절반 압축)
+- WUXGA 모드: 1920x1200 SBS → per eye 960x1200 (너비 절반 압축)
+
+출력 인터페이스: DVI-D (PORT A/B), 3G-SDI Level B (SMPTE424M)
+3D 포맷: SIDE BY SIDE 또는 LINE BY LINE 선택 가능
+
+### 구형 CV-190 vs 신형 OTV-S300 per eye 비교
+
+항목 | CV-190 (구형) | OTV-S300 (신형)
+--- | --- | ---
+출력 방식 | 2채널 개별 Full HD | 1채널 SBS (수평 압축)
+per eye 원본 | 1920x1080 | 960x1080 (너비 절반)
+캡처카드 | 2개 | 1개
+Mac 합성 | 필요 (FrameSync + SBS 합성) | 불필요
+
+### Vision Pro / Galaxy XR 최종 표시 해상도 비교
+
+경로 | per eye 원본 | 합성 | downsample 1.5x | 최종 per eye
+--- | --- | --- | --- | ---
+CV-190 → Mac 합성 | 1920x1080 | Half SBS → 960x540 | 640x360 | **640x360**
+OTV-S300 → 직접 수신 | 960x1080 | 불필요 | 640x720 | **640x720**
+
+OTV-S300 경로가 세로 해상도 2배. SBS로 너비는 절반이지만 높이는 1080 그대로 유지되기 때문.
+단, Mac 앱이 OTV-S300의 SBS를 Half SBS로 재합성하지 않고 그대로 전송해야 이 이점 유지.
+
 ### 확인 필요 사항
 
-- OTV-S300 SBS 출력 해상도 확인 (1920x1080 예상)
-- DVI→HDMI 어댑터 준비
-- Mac 앱에서 단일 캡처카드 SBS 수신 모드 테스트
+- OTV-S300 터치패널에서 3D 모드 + SBS 출력 설정
+- DVI→HDMI 패시브 어댑터 준비
+- Mac 앱에서 단일 캡처카드 SBS 직접 수신 모드 테스트 (재합성 없이)
 
 ### 3D 모델 관련 이슈 (미해결)
 
