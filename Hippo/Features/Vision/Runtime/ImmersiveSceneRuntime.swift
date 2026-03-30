@@ -28,6 +28,9 @@ final class ImmersiveSceneRuntime {
     var selectedEntity: Entity?
     private var eventSubscription: EventSubscription?
 
+    /// 배치된 3D 모델 URL 목록 (설정 복귀 시 복원용)
+    private var placedModelURLs: [URL] = []
+
     private let placementService: EntityPlacementService = .init()
 
     // RealityView 의 content 관리
@@ -113,11 +116,29 @@ final class ImmersiveSceneRuntime {
 
         do {
             selectedEntity = try await placementService.attach(url: url, to: anchor)
+            placedModelURLs.append(url)
             logger.debug("Entity from URL '\(url.lastPathComponent)' placed successfully.")
         } catch {
             logger.error("Failed to attach entity from URL: \(error)")
-            // 실패 시 생성했던 앵커 정리
             anchor.removeFromParent()
+        }
+    }
+
+    /// 이전에 배치된 3D 모델들을 복원
+    func restorePlacedModels() async {
+        guard let sceneRoot = sceneRoot, !placedModelURLs.isEmpty else { return }
+        logger.debug("Restoring \(self.placedModelURLs.count) placed models...")
+
+        for url in placedModelURLs {
+            let anchor = placementService.placeAnchorInFront()
+            sceneRoot.addChild(anchor)
+            do {
+                selectedEntity = try await placementService.attach(url: url, to: anchor)
+                logger.debug("Restored: \(url.lastPathComponent)")
+            } catch {
+                logger.error("Failed to restore: \(url.lastPathComponent)")
+                anchor.removeFromParent()
+            }
         }
     }
 
@@ -139,13 +160,9 @@ final class ImmersiveSceneRuntime {
     }
 
     func stop() {
-        logger.debug("🐛 ImmersiveSceneRuntime stopped")
-        topAnchor = nil
-
-        // AR 세션 정리 (timer + world tracking 해제)
-        ARSessionController.shared.stopARSession()
-
-        // 제스쳐 이벤트 구독 정리
-        eventSubscription?.cancel()
+        logger.debug("ImmersiveSceneRuntime stopped")
+        // NOTE: AR session과 topAnchor를 유지해야 3D 모델이 보존됨
+        // stopARSession()을 호출하면 AR 앵커가 무효화되어 배치된 모델이 사라짐
+        // AR session은 ImmersiveSpace가 dismiss될 때 자동 정리됨
     }
 }

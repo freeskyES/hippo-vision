@@ -57,9 +57,6 @@ struct ImmersiveSurgeryView: View {
             initializeVoiceControl()
             runtime.start()
         }
-        .onDisappear {
-            runtime.stop()
-        }
     }
 
     // MARK: - Subviews
@@ -67,6 +64,10 @@ struct ImmersiveSurgeryView: View {
     private var realityView: some View {
         RealityView { content, attachments in
             runtime.setupScene(in: content, attachments: attachments)
+            // setupScene 완료 후 이전에 배치한 3D 모델 복원
+            Task {
+                await runtime.restorePlacedModels()
+            }
         } attachments: {
             // Test: Pure hover button (left)
             Attachment(id: AttachmentIDs.voiceTriggerButton) {

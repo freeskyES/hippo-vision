@@ -64,19 +64,13 @@ final class ARSessionController {
     }
     
     func stopARSession() {
-        guard session != nil else { return }
-        if timer == nil { return }
-        
         timer?.invalidate()
         timer = nil
-        Task { [session] in
-            if let session = session {
-                session.stop()
-            }
-            self.session = nil
-            self.worldTracking = nil
-        }
-        
-        logger.debug("Start AR Session Successfully")
+
+        session?.stop()
+        session = nil
+        worldTracking = nil
+
+        logger.debug("AR Session stopped")
     }
 }

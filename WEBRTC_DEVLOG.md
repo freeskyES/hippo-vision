@@ -2,6 +2,58 @@
 
 ---
 
+## 2026-03-30: OTV-S300 3D 내시경 연결 계획 + 수술 전 준비
+
+### OTV-S300 연결 방식 확인
+
+수술실에 Olympus OTV-S300 3D 내시경이 있다. 구형 CV-190(2유닛)과 달리 **단일 유닛에서 SBS 출력**을 지원한다.
+
+```
+구형 CV-190:  유닛 2개 → DVI-D 2개 → 캡처카드 2개 → Mac에서 SBS 합성
+OTV-S300:    유닛 1개 → DVI-D 1개 (SBS 출력) → 캡처카드 1개 → Mac에서 바로 수신
+```
+
+OTV-S300의 DVI-D PORT A에서 SIDE BY SIDE 모드로 설정하면, 좌/우 영상이 한 프레임에 합쳐서 나온다. 우리 파이프라인에 바로 맞는 형태.
+
+### 연결 구성
+
+```
+OTV-S300 DVI-D (SBS 모드)
+  → DVI→HDMI 패시브 어댑터
+  → Elgato 캡처카드 (HDMI 입력)
+  → Mac (SBS 프레임 수신)
+  → HEVC 인코딩 + WebRTC 전송
+  → Vision Pro (3D Stereo 표시)
+```
+
+구형 대비 장점:
+- 캡처카드 1개 (2개 불필요)
+- FrameSync 불필요 (OTV-S300이 동기화된 SBS를 출력)
+- SBS 합성 불필요 (이미 합쳐짐)
+- 레이턴시 감소 (합성 단계 제거)
+
+### 확인 필요 사항
+
+- OTV-S300 SBS 출력 해상도 확인 (1920x1080 예상)
+- DVI→HDMI 어댑터 준비
+- Mac 앱에서 단일 캡처카드 SBS 수신 모드 테스트
+
+### 3D 모델 관련 이슈 (미해결)
+
+- 수술 중 설정/홈 화면 전환 시 3D 모델 사라짐
+- 원인: ImmersiveSurgeryView.onDisappear → runtime.stop() → 엔티티 정리
+- onDisappear에서 stop() 제거했으나 SwiftUI RealityView 재생성 문제 잔존
+- 워크어라운드: 3D 모델 배치 후 홈/설정 화면 전환 금지
+- 수술 후 근본 수정 예정
+
+### Public WiFi WebRTC 이슈
+
+- 공용 WiFi에서 ICE candidate 교환은 되지만 연결 실패
+- 원인: Public WiFi에서 UDP 포트 차단 추정
+- 수술실에서는 전용 WiFi(ASUS RT-BE58 Go 5GHz) 사용 필요
+
+---
+
 ## 2026-03-27: 인코더 동적 전환 구현
 
 ### 단일 브랜치 통합을 위한 첫 단계
