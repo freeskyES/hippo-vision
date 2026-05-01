@@ -102,22 +102,6 @@ public final class StreamingControlViewModel {
         }
     }
 
-    var isHalfBitrateEnabled: Bool = false {
-        didSet {
-            logger.info("Bitrate mode changed: \(oldValue ? "15 Mbps" : "30 Mbps") → \(self.isHalfBitrateEnabled ? "15 Mbps" : "30 Mbps")")
-
-            // 스트리밍 중이면 재시작
-            if isStreaming {
-                logger.info("Restarting streaming due to bitrate change...")
-                Task {
-                    stopStreaming()
-                    try? await Task.sleep(for: .milliseconds(500))
-                    try? await startStreaming()
-                }
-            }
-        }
-    }
-
     var cameraInputMode: CameraInputMode = .dual {
         didSet {
             logger.info("Camera input mode changed: \(oldValue.rawValue) → \(self.cameraInputMode.rawValue)")

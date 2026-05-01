@@ -9,64 +9,33 @@ import SwiftUI
 
 struct ScalingSectionView: View {
     @Binding var selectedScaling: ScalingMode
-    @Binding var isHalfBitrateEnabled: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Resolution & Bitrate")
+            Text("Resolution")
                 .font(.system(size: 28, weight: .bold))
                 .foregroundColor(.black)
 
-            HStack(alignment: .top, spacing: 24) {
-                // Resolution Scale
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Resolution Scale")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Resolution Scale")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.secondary)
 
-                    HStack(spacing: 8) {
-                        ForEach(ScalingMode.allCases.filter { [.none, .half, .quarter].contains($0) }, id: \.self) { mode in
-                            ScalingButton(
-                                mode: mode,
-                                isSelected: selectedScaling == mode,
-                                action: { selectedScaling = mode }
-                            )
-                        }
+                HStack(spacing: 8) {
+                    ForEach(ScalingMode.allCases.filter { [.none, .half, .quarter].contains($0) }, id: \.self) { mode in
+                        ScalingButton(
+                            mode: mode,
+                            isSelected: selectedScaling == mode,
+                            action: { selectedScaling = mode }
+                        )
                     }
-                    .padding(4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.white)
-                            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
-                    )
                 }
-
-                // Bitrate Toggle
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Bitrate")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.secondary)
-
-                    HStack(spacing: 12) {
-                        Toggle(isOn: $isHalfBitrateEnabled) {
-                            HStack(spacing: 8) {
-                                Text("Half")
-                                    .font(.system(size: 14, weight: .medium))
-                                Text(isHalfBitrateEnabled ? "15 Mbps" : "30 Mbps")
-                                    .font(.system(size: 13, weight: .regular))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .toggleStyle(HippoToggleStyle())
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.white)
-                            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
-                    )
-                }
+                .padding(4)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.white)
+                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
+                )
             }
         }
         .padding(12)
@@ -104,23 +73,3 @@ struct ScalingButton: View {
     }
 }
 
-struct HippoToggleStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack {
-            configuration.label
-
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(configuration.isOn ? Color("HippoPrimary") : Color.gray.opacity(0.3))
-                    .frame(width: 42, height: 24)
-
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 18, height: 18)
-                    .offset(x: configuration.isOn ? 9 : -9)
-                    .animation(.easeInOut(duration: 0.2), value: configuration.isOn)
-            }
-            .onTapGesture { configuration.isOn.toggle() }
-        }
-    }
-}

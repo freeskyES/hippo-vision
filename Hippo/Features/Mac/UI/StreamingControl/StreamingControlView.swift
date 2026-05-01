@@ -49,8 +49,7 @@ struct StreamingControlView: View {
                     )
 
                     ScalingSectionView(
-                        selectedScaling: $viewModel.scalingMode,
-                        isHalfBitrateEnabled: $viewModel.isHalfBitrateEnabled
+                        selectedScaling: $viewModel.scalingMode
                     )
                 }
 
